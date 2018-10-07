@@ -50,3 +50,5 @@ hs_err_pid*
 /Game/target/
 /application/target/
 /asteroids/target/
+
+config\.properties
