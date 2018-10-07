@@ -23,135 +23,139 @@ import org.slf4j.LoggerFactory;
  * @author Jeppe Boysen Vennekilde
  */
 public class WebsiteConnector {
-    private static final Logger logger = LoggerFactory.getLogger(WebsiteConnector.class);
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(WebsiteConnector.class);
     private static final String STATUS_BASE_URL = "Modules/Verification/REST/Restricted/VerificationStatus.php?service-id=2";
     private static final String NEW_SESSION_BASE_URL = "REST/Restricted/User/GenerateServiceSession.php?service-id=2";
     private static final String GRANT_TEMPORARY_ACCESS_BASE_URL = "Modules/Verification/REST/Restricted/GrantTemporaryAccess.php?service-id=2";
     private static final String SET_USER_SERVICE_LINK_ATTRIBUTE_BASE_URL = "REST/Restricted/User/SetUserServiceLinkAttribute.php?service-id=2";
     private final String baseRESTURL;
-    
-    public WebsiteConnector(String baseRESTURL){
+
+    public WebsiteConnector(String baseRESTURL) {
         this.baseRESTURL = baseRESTURL;
     }
-    
-    public Map<String, AccessStatusData> getAccessStatusForUsers(SimpleEntry<String,String>... userIds){
+
+    public Map<String, AccessStatusData> getAccessStatusForUsers(SimpleEntry<String, String>... userIds) {
         Map<String, AccessStatusData> results = new HashMap();
         try {
             StringBuilder userIdsString = new StringBuilder();
-            for(SimpleEntry<String,String> entry : userIds){
+            for (SimpleEntry<String, String> entry : userIds) {
                 userIdsString.append(entry.getKey());
-                if(entry.getValue() != null){
+                if (entry.getValue() != null) {
                     userIdsString.append(":").append(entry.getValue().replace(",", " "));
                 }
             }
             String url = baseRESTURL + STATUS_BASE_URL + "&enum-ids&user-ids=" + URLEncoder.encode(userIdsString.toString(), "UTF-8");
             String content = IOUtils.toString(new URL(url), Charset.forName("UTF-8"));
-            logger.info("Recieved JSON Response: "+content);
+//            LOGGER.info("Recieved JSON Response: "+content);
             JSONObject jsonObject = new JSONObject(content);
             for (String discordId : jsonObject.keySet()) {
                 JSONObject userVerificationStatusJson = jsonObject.getJSONObject(discordId);
-                
+
                 //Access status
                 int accessStatusOrdinal = userVerificationStatusJson.getInt("status");
                 AccessStatusData accessStatusData = new AccessStatusData(AccessStatus.values()[accessStatusOrdinal]);
-                
+
                 //Check if access is temporary and when it expires
-                if(userVerificationStatusJson.has("expires-in")){
+                if (userVerificationStatusJson.has("expires-in")) {
                     int expiresIn = userVerificationStatusJson.getInt("expires-in");
                     accessStatusData.setExpires(expiresIn);
                 }
-                
+
                 //Check for ban reason
-                if(accessStatusData.getAccessStatus() == AccessStatus.ACCESS_DENIED_BANNED){
+                if (accessStatusData.getAccessStatus() == AccessStatus.ACCESS_DENIED_BANNED) {
                     String banReason = userVerificationStatusJson.getString("ban-reason");
                     accessStatusData.setBanReason(banReason);
                 }
-                
+
                 //Check if the access granted is to a music bot
-                if(userVerificationStatusJson.has("mirror-link-owner")){
+                if (userVerificationStatusJson.has("mirror-link-owner")) {
                     JSONObject mirrorLink = userVerificationStatusJson.getJSONObject("mirror-link-owner");
                     String primaryUserId = mirrorLink.getString("mirror_owner_user_id");
-                    logger.info("Found primary tsDbid: "+primaryUserId);
-                    if(primaryUserId != discordId){
+                    LOGGER.info("Found primary discordId: " + primaryUserId);
+                    if (primaryUserId != discordId) {
                         accessStatusData.setMusicBotOwner(primaryUserId);
-                    } 
+                    }
                 }
-                
+
                 //Check if the user service link used has any attributes
-                if(userVerificationStatusJson.has("attributes")){
+                if (userVerificationStatusJson.has("attributes")) {
                     String attributesString = userVerificationStatusJson.getString("attributes");
                     JSONObject attributes = new JSONObject(attributesString);
                     accessStatusData.setAttributes(attributes);
                 }
-                
+
                 results.put(discordId, accessStatusData);
             }
         } catch (IOException ex) {
-            logger.error("Could not connect to website REST API", ex);
-            for (SimpleEntry<String,String> entry : userIds) {
+            LOGGER.error("Could not connect to website REST API", ex);
+            for (SimpleEntry<String, String> entry : userIds) {
                 results.put(entry.getKey().toString(), new AccessStatusData(AccessStatus.COULD_NOT_CONNECT));
             }
         }
         return results;
     }
-    
-    public String createSession(long serviceId, String ip, String displayName){
+
+    public Session createSession(long serviceId, String ip, String displayName) {
         return createSession(serviceId, ip, displayName, true);
     }
-    public String createSession(long serviceId, String ip, String displayName, boolean isPrimary){
-        String session = null;
+
+    public Session createSession(long serviceId, String ip, String displayName, boolean isPrimary) {
+        Session session = null;
         try {
-            String url = baseRESTURL + NEW_SESSION_BASE_URL + "&user-id=" + serviceId + "&ip="+ip+"&displayname="+URLEncoder.encode(displayName, "UTF-8")+"&is-primary="+isPrimary;
+            String url = baseRESTURL + NEW_SESSION_BASE_URL + "&user-id=" + serviceId + "&ip=" + ip + "&displayname=" + URLEncoder.encode(displayName, "UTF-8") + "&is-primary=" + isPrimary;
             JSONObject jsonObject = new JSONObject(IOUtils.toString(new URL(url), Charset.forName("UTF-8")));
-            if(jsonObject.has("error")){
-                logger.info("Could not create new ts session for tsDbid: "+serviceId, jsonObject.get("error"));
+            if (jsonObject.has("error")) {
+                LOGGER.info("Could not create new ts session for tsDbid: " + serviceId, jsonObject.get("error"));
             } else {
-                session = jsonObject.getString("session");
+                session = new Session(
+                        jsonObject.getString("session"),
+                        jsonObject.getLong("valid-to"));
             }
-        } catch (IOException ex) { 
-            logger.info("Could not create new ts session", ex);
+        } catch (IOException ex) {
+            LOGGER.info("Could not create new ts session", ex);
         }
         return session;
     }
-    
-    public boolean grantTemporaryAccess(int tsDbid, String nickname, AccessType accessType){
+
+    public boolean grantTemporaryAccess(long discordId, String nickname, AccessType accessType) {
         boolean success = false;
         String response = null;
         try {
-            String params = "&user-id=" + tsDbid + "&displayname="+URLEncoder.encode(nickname.replace(",", " "), "UTF-8")+"&accesstype="+accessType.name();
+            String params = "&user-id=" + discordId + "&displayname=" + URLEncoder.encode(nickname.replace(",", " "), "UTF-8") + "&accesstype=" + accessType.name();
             String url = baseRESTURL + GRANT_TEMPORARY_ACCESS_BASE_URL + params;
             response = IOUtils.toString(new URL(url), Charset.forName("UTF-8"));
             JSONObject jsonObject = new JSONObject(response);
-            if(jsonObject.has("error")){
-                logger.info("Could not grant temporary access to tsDbid: "+tsDbid, jsonObject.get("error"));
+            if (jsonObject.has("error")) {
+                LOGGER.info("Could not grant temporary access to discordId: " + discordId, jsonObject.get("error"));
             } else {
                 success = jsonObject.getString("result").equals("granted");
             }
-        } catch (IOException | JSONException ex) { 
-            logger.info("Could not grant temporary access. Response: "+response, ex);
+        } catch (IOException | JSONException ex) {
+            LOGGER.info("Could not grant temporary access. Response: " + response, ex);
         }
         return success;
     }
-    
-    public boolean SetUserServiceLinkAttribute(int tsDbid, String name, String value){
+
+    public boolean SetUserServiceLinkAttribute(long discordId, String name, String value) {
         boolean success = false;
         String response = null;
         try {
-            String params = "&user-id=" + tsDbid + "&name="+name+"&value="+value;
+            String params = "&user-id=" + discordId + "&name=" + name + "&value=" + value;
             String url = baseRESTURL + SET_USER_SERVICE_LINK_ATTRIBUTE_BASE_URL + params;
             response = IOUtils.toString(new URL(url), Charset.forName("UTF-8"));
             JSONObject jsonObject = new JSONObject(response);
-            if(jsonObject.has("error")){
-                logger.info("Could not set attribute for tsDbid: "+tsDbid, jsonObject.get("error"));
+            if (jsonObject.has("error")) {
+                LOGGER.info("Could not set attribute for discordId: " + discordId, jsonObject.get("error"));
             } else {
                 success = jsonObject.getString("result").equals("success");
             }
-        } catch (IOException | JSONException ex) { 
-            logger.info("Could not set attribute . Response: "+response, ex);
+        } catch (IOException | JSONException ex) {
+            LOGGER.info("Could not set attribute . Response: " + response, ex);
         }
         return success;
     }
-    
+
     public enum AccessType {
         HOME_SERVER,
         LINKED_SERVER
