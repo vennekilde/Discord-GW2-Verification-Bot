@@ -5,7 +5,7 @@ FROM openjdk:8
 
 ENV VERSION 1.0.0
 
-ADD https://github.com/vennekilde/Discord-GW2-Verification-Bot/releases/download/${VERSION}/DiscordServerLink.jar /app/DiscordServerLink.jar
+ADD https://github.com/vennekilde/Discord-GW2-Verification-Bot/releases/download/${VERSION}/Discord-GW2-Verification-Bot-${VERSION}.jar.jar /app/Discord-GW2-Verification-Bot.jar
 
 COPY ts3bot-entrypoint.sh /app/discordbot-entrypoint.sh
 
