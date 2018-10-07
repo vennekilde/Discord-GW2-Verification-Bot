@@ -14,4 +14,13 @@
                 <exec.executable>java</exec.executable>
             </properties>
         </action>
+        <action>
+            <actionName>CUSTOM-Build with Dependencies</actionName>
+            <displayName>Build with Dependencies</displayName>
+            <goals>
+                <goal>clean</goal>
+                <goal>compile</goal>
+                <goal>assembly:single</goal>
+            </goals>
+        </action>
     </actions>
