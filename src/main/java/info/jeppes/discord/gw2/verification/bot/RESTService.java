@@ -30,25 +30,22 @@ public class RESTService implements HttpHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RESTService.class);
 
-    private final String[] allowedIPs = new String[]{"80.198.76.139", "212.113.133.235", "178.62.152.183", "localhost", "0:0:0:0:0:0:0:1"};
-
     @Override
     public void handle(HttpExchange request) {
         try {
             String requesterIP = request.getRemoteAddress().getAddress().getHostAddress();
-            boolean allowed = false;
-            for (String allowedIP : allowedIPs) {
-                if (requesterIP.equalsIgnoreCase(allowedIP)) {
-                    allowed = true;
-                    break;
-                }
+            Map<String, String> queryMap = queryToMap(request.getRequestURI().getQuery());
+            String accessToken = DiscordMain.getConfig().getString("rest_access_token");
+            if (accessToken == null || accessToken.isEmpty()) {
+                LOGGER.warn("REST Endpoint disabled. No rest_access_token set in config");
+                return;
             }
-            if (!allowed) {
-                LOGGER.info("Rejected ip: " + requesterIP);
+            if (!queryMap.get("access-token").equals(accessToken)) {
+                LOGGER.warn("Rejected ip: " + requesterIP);
                 return;
             }
 
-            handleAsync(request);
+            handleAsync(request, queryMap);
 
             String response = "1";
             request.sendResponseHeaders(200, response.length());
@@ -61,14 +58,13 @@ public class RESTService implements HttpHandler {
         }
     }
 
-    private void handleAsync(final HttpExchange request) {
+    private void handleAsync(final HttpExchange request, final Map<String, String> queryMap) {
         threadPool.submit(new Runnable() {
             @Override
             public void run() {
                 try {
                     LOGGER.info("Recieved request: " + request.getRequestURI().getQuery());
                     if (request.getRequestURI().getQuery() != null) {
-                        Map<String, String> queryMap = queryToMap(request.getRequestURI().getQuery());
                         for (Map.Entry<String, String> param : queryMap.entrySet()) {
                             switch (param.getKey()) {
                                 //Refresh user access

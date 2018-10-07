@@ -78,10 +78,11 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     private Map<Long, User> scheduledRefreshesMap;
     private List<Long> userRefreshingRoles;
 
-    public DiscordBot() {
+    public DiscordBot(ResourceBundle config) {
         scheduledRefreshesMap = new HashMap();
         scheduledRefreshes = new LinkedList();
         userRefreshingRoles = new ArrayList();
+        this.config = config;
     }
 
     public WebsiteConnector getWebsiteConnector() {
@@ -93,16 +94,6 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     }
 
     public void init() throws IOException {
-        String configPathEnv = System.getenv("BOT_CONFIG_PATH");
-        File configFile;
-        if (configPathEnv != null) {
-            configFile = new File(configPathEnv);
-        } else {
-            configFile = new File(System.getProperty("user.dir"), "config.properties");
-        }
-        try (FileInputStream fis = new FileInputStream(configFile)) {
-            config = new PropertyResourceBundle(fis);
-        }
         websiteConnector = new WebsiteConnector(getConfig().getString("base_rest_url"));
 
         try {

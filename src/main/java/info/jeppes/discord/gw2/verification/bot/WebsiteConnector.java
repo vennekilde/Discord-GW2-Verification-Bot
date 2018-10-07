@@ -29,6 +29,13 @@ public class WebsiteConnector {
     private static final String NEW_SESSION_BASE_URL = "REST/Restricted/User/GenerateServiceSession.php?service-id=2";
     private static final String GRANT_TEMPORARY_ACCESS_BASE_URL = "Modules/Verification/REST/Restricted/GrantTemporaryAccess.php?service-id=2";
     private static final String SET_USER_SERVICE_LINK_ATTRIBUTE_BASE_URL = "REST/Restricted/User/SetUserServiceLinkAttribute.php?service-id=2";
+    private static final String ACCESS_TOKEN_QUERY_STRING;
+
+    static {
+        String accessToken = DiscordMain.getConfig().getString("rest_access_token");
+        ACCESS_TOKEN_QUERY_STRING = "&access-token=" + accessToken;
+    }
+
     private final String baseRESTURL;
 
     public WebsiteConnector(String baseRESTURL) {
@@ -45,7 +52,7 @@ public class WebsiteConnector {
                     userIdsString.append(":").append(entry.getValue().replace(",", " "));
                 }
             }
-            String url = baseRESTURL + STATUS_BASE_URL + "&enum-ids&user-ids=" + URLEncoder.encode(userIdsString.toString(), "UTF-8");
+            String url = baseRESTURL + STATUS_BASE_URL + ACCESS_TOKEN_QUERY_STRING + "&enum-ids&user-ids=" + URLEncoder.encode(userIdsString.toString(), "UTF-8");
             String content = IOUtils.toString(new URL(url), Charset.forName("UTF-8"));
 //            LOGGER.info("Recieved JSON Response: "+content);
             JSONObject jsonObject = new JSONObject(content);
@@ -103,7 +110,7 @@ public class WebsiteConnector {
     public Session createSession(long serviceId, String ip, String displayName, boolean isPrimary) {
         Session session = null;
         try {
-            String url = baseRESTURL + NEW_SESSION_BASE_URL + "&user-id=" + serviceId + "&ip=" + ip + "&displayname=" + URLEncoder.encode(displayName, "UTF-8") + "&is-primary=" + isPrimary;
+            String url = baseRESTURL + NEW_SESSION_BASE_URL + ACCESS_TOKEN_QUERY_STRING + "&user-id=" + serviceId + "&ip=" + ip + "&displayname=" + URLEncoder.encode(displayName, "UTF-8") + "&is-primary=" + isPrimary;
             JSONObject jsonObject = new JSONObject(IOUtils.toString(new URL(url), Charset.forName("UTF-8")));
             if (jsonObject.has("error")) {
                 LOGGER.info("Could not create new ts session for tsDbid: " + serviceId, jsonObject.get("error"));
@@ -123,7 +130,7 @@ public class WebsiteConnector {
         String response = null;
         try {
             String params = "&user-id=" + discordId + "&displayname=" + URLEncoder.encode(nickname.replace(",", " "), "UTF-8") + "&accesstype=" + accessType.name();
-            String url = baseRESTURL + GRANT_TEMPORARY_ACCESS_BASE_URL + params;
+            String url = baseRESTURL + GRANT_TEMPORARY_ACCESS_BASE_URL + ACCESS_TOKEN_QUERY_STRING + params;
             response = IOUtils.toString(new URL(url), Charset.forName("UTF-8"));
             JSONObject jsonObject = new JSONObject(response);
             if (jsonObject.has("error")) {
@@ -142,7 +149,7 @@ public class WebsiteConnector {
         String response = null;
         try {
             String params = "&user-id=" + discordId + "&name=" + name + "&value=" + value;
-            String url = baseRESTURL + SET_USER_SERVICE_LINK_ATTRIBUTE_BASE_URL + params;
+            String url = baseRESTURL + SET_USER_SERVICE_LINK_ATTRIBUTE_BASE_URL + ACCESS_TOKEN_QUERY_STRING + params;
             response = IOUtils.toString(new URL(url), Charset.forName("UTF-8"));
             JSONObject jsonObject = new JSONObject(response);
             if (jsonObject.has("error")) {
