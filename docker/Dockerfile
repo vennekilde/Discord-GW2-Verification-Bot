@@ -7,7 +7,7 @@ ENV VERSION 1.0.0
 
 ADD https://github.com/vennekilde/Discord-GW2-Verification-Bot/releases/download/${VERSION}/Discord-GW2-Verification-Bot-${VERSION}.jar.jar /app/Discord-GW2-Verification-Bot.jar
 
-COPY ts3bot-entrypoint.sh /app/discordbot-entrypoint.sh
+COPY discordbot-entrypoint.sh /app/discordbot-entrypoint.sh
 
 RUN chmod +x /app/discordbot-entrypoint.sh
 WORKDIR /app
