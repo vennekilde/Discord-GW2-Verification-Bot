@@ -3,7 +3,7 @@
 # and open the template in the editor.
 FROM openjdk:8
 
-ENV VERSION 1.0.0
+ENV VERSION 1.0.1
 
 ADD https://github.com/vennekilde/Discord-GW2-Verification-Bot/releases/download/${VERSION}/Discord-GW2-Verification-Bot-${VERSION}.jar /app/Discord-GW2-Verification-Bot.jar
 
