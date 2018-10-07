@@ -5,7 +5,7 @@ FROM openjdk:8
 
 ENV VERSION 1.0.0
 
-ADD https://github.com/vennekilde/Discord-GW2-Verification-Bot/releases/download/${VERSION}/Discord-GW2-Verification-Bot-${VERSION}.jar.jar /app/Discord-GW2-Verification-Bot.jar
+ADD https://github.com/vennekilde/Discord-GW2-Verification-Bot/releases/download/${VERSION}/Discord-GW2-Verification-Bot-${VERSION}.jar /app/Discord-GW2-Verification-Bot.jar
 
 COPY discordbot-entrypoint.sh /app/discordbot-entrypoint.sh
 
