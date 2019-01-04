@@ -5,6 +5,8 @@
  */
 package info.jeppes.discord.gw2.verification.bot;
 
+import info.jeppes.discord.gw2.verification.bot.utils.TimeUtils;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -12,9 +14,9 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.ResourceBundle;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -29,23 +31,21 @@ import net.dv8tion.jda.core.JDA;
 import net.dv8tion.jda.core.JDABuilder;
 import net.dv8tion.jda.core.entities.Guild;
 import net.dv8tion.jda.core.entities.Member;
+import net.dv8tion.jda.core.entities.MessageHistory;
 import net.dv8tion.jda.core.entities.Role;
+import net.dv8tion.jda.core.entities.TextChannel;
 import net.dv8tion.jda.core.entities.User;
 import net.dv8tion.jda.core.events.ReadyEvent;
 import net.dv8tion.jda.core.events.guild.member.GuildMemberJoinEvent;
-import net.dv8tion.jda.core.events.message.MessageReceivedEvent;
-import net.dv8tion.jda.core.hooks.ListenerAdapter;
-import net.dv8tion.jda.core.requests.restaction.AuditableRestAction;
-import net.dv8tion.jda.core.requests.restaction.MessageAction;
-import org.slf4j.LoggerFactory;
-import info.jeppes.discord.gw2.verification.bot.utils.TimeUtils;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.util.PropertyResourceBundle;
 import net.dv8tion.jda.core.events.guild.member.GuildMemberRoleAddEvent;
 import net.dv8tion.jda.core.events.guild.member.GuildMemberRoleRemoveEvent;
+import net.dv8tion.jda.core.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.core.hooks.ListenerAdapter;
+import net.dv8tion.jda.core.requests.RequestFuture;
+import net.dv8tion.jda.core.requests.restaction.AuditableRestAction;
+import net.dv8tion.jda.core.requests.restaction.MessageAction;
 import org.json.JSONObject;
+import org.slf4j.LoggerFactory;
 
 /**
  *
@@ -61,6 +61,8 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     private static final String TEMP_LINKED_WORLD_ROLE_ID = "451360652875923457";
 //    private static final String MUSIC_BOT_ROLE_NAME = "182813018919272448";
     private static final String GUILD_ID = "174512426056810497";
+    private static final String WELCOME_CHANNEL = "529635390164959232";
+    private static final String SERVER_NAME = "Far Shiverpeaks";
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
@@ -128,11 +130,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     }
                 }, 0, TimeUnit.MINUTES);
             }
-        } catch (LoginException ex) {
-            Logger.getLogger(DiscordBot.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IllegalArgumentException ex) {
-            Logger.getLogger(DiscordBot.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (InterruptedException ex) {
+        } catch (LoginException | IllegalArgumentException | InterruptedException ex) {
             Logger.getLogger(DiscordBot.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
@@ -174,6 +172,27 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     public void onGuildMemberJoin(GuildMemberJoinEvent event) {
         sendRulesMessage(event.getUser());
         sendVerifyMessageCheckAccess(event.getUser());
+        sendWelcomeMessage(event.getUser());
+    }
+
+    private void sendWelcomeMessage(User user) {
+        String messageString = "Hey <@" + user.getId() + ">, welcome to *" + SERVER_NAME + "* :hugging: :tada: !";
+        TextChannel channel = discordAPI.getTextChannelById(WELCOME_CHANNEL);
+        if (channel != null) {
+            try {
+                MessageHistory.MessageRetrieveAction history = channel.getHistoryAfter("529644659262357526", 100);
+                RequestFuture<MessageHistory> submit = history.submit();
+                submit.get().getRetrievedHistory().forEach((message) -> {
+                    if (!message.isPinned()) {
+                        message.delete().submit();
+                    }
+                });
+            } catch (InterruptedException | ExecutionException ex) {
+                Logger.getLogger(DiscordBot.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            MessageAction message = channel.sendMessage(messageString);
+            message.submit();
+        }
     }
 
     public void sendVerifyMessageCheckAccess(User user) {
