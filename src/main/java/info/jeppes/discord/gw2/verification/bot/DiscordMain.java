@@ -59,7 +59,7 @@ public class DiscordMain {
 
     public static void destroyDiscordBot() throws DestroyFailedException {
         if (discordBot != null) {
-            LOGGER.info("Destroying Teamspeak bot instance");
+            LOGGER.info("Destroying Discord bot instance");
             discordBot.destroy();
             discordBot = null;
         }
@@ -69,7 +69,7 @@ public class DiscordMain {
         if (discordBot != null) {
             destroyDiscordBot();
         }
-        LOGGER.info("Initiating Teamspeak bot instance");
+        LOGGER.info("Initiating Discord bot instance");
         discordBot = new DiscordBot(getConfig());
         discordBot.init();
     }
