@@ -423,15 +423,16 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     }
                     break;
                 case ACCESS_GRANTED_HOME_WORLD_TEMPORARY:
-                    if (!accessStatus.isMusicBot()) {
-                        //Access is primary and not a music bot
-                        addRoleToUserIfNotOwned(member, rolesForUser, tempHomeWorldRole);
-                        removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempLinkedWorldRole/*, musicBotRole*/);
-                    } else {
-                        //Access is granted trough another user and is a music bot
-                        addRoleToUserIfNotOwned(member, rolesForUser/*, musicBotRole*/);
-                        removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempHomeWorldRole, tempLinkedWorldRole);
-                    }
+                    //Don't assign temporary groups, just let mods/commanders deal with them
+//                    if (!accessStatus.isMusicBot()) {
+//                        //Access is primary and not a music bot
+//                        addRoleToUserIfNotOwned(member, rolesForUser, tempHomeWorldRole);
+//                        removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempLinkedWorldRole/*, musicBotRole*/);
+//                    } else {
+//                        //Access is granted trough another user and is a music bot
+//                        addRoleToUserIfNotOwned(member, rolesForUser/*, musicBotRole*/);
+//                        removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempHomeWorldRole, tempLinkedWorldRole);
+//                    }
                     break;
                 case ACCESS_GRANTED_LINKED_WORLD:
                     if (!accessStatus.isMusicBot()) {
@@ -445,15 +446,16 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     }
                     break;
                 case ACCESS_GRANTED_LIMKED_WORLD_TEMPORARY:
-                    if (!accessStatus.isMusicBot()) {
-                        //Access is primary and not a music bot
-                        addRoleToUserIfNotOwned(member, rolesForUser, tempLinkedWorldRole);
-                        removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempHomeWorldRole/*, musicBotRole*/);
-                    } else {
-                        //Access is granted trough another user and is a music bot
-                        addRoleToUserIfNotOwned(member, rolesForUser/*, musicBotRole*/);
-                        removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempHomeWorldRole, tempLinkedWorldRole);
-                    }
+                    //Don't assign temporary groups, just let mods/commanders deal with them
+//                    if (!accessStatus.isMusicBot()) {
+//                        //Access is primary and not a music bot
+//                        addRoleToUserIfNotOwned(member, rolesForUser, tempLinkedWorldRole);
+//                        removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempHomeWorldRole/*, musicBotRole*/);
+//                    } else {
+//                        //Access is granted trough another user and is a music bot
+//                        addRoleToUserIfNotOwned(member, rolesForUser/*, musicBotRole*/);
+//                        removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempHomeWorldRole, tempLinkedWorldRole);
+//                    }
                     break;
                 case ACCESS_DENIED_ACCOUNT_NOT_LINKED:
                 case ACCESS_DENIED_UNKNOWN:
