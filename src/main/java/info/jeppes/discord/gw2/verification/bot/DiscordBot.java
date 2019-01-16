@@ -209,9 +209,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             LOGGER.info("User {} voted {}", event.getUser().getId(), event.getReactionEmote().getName().hashCode());
             Message message = event.getChannel().getMessageById(event.getMessageId()).complete();
             message.getReactions().forEach((reaction) -> {
-                if (!event.getReaction().getReactionEmote().getName().equals(reaction.getReactionEmote().getName())) {
-                    reaction.removeReaction(event.getUser()).complete();
-                }
+//                if (!event.getReaction().getReactionEmote().getName().equals(reaction.getReactionEmote().getName())) {
+                reaction.removeReaction(event.getUser()).complete();
+//                }
             });
         }
     }
