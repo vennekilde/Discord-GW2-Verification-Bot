@@ -5,7 +5,7 @@ services:
 script:
   - mvn package
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-  - docker build -t fsp-discord-bot docker
+  - docker build -t fsp-discord-bot -f docker/Dockerfile .
   - docker images
   - docker tag fsp-discord-bot $DOCKER_USERNAME/fsp-discord-bot
   - docker push $DOCKER_USERNAME/fsp-discord-bot
