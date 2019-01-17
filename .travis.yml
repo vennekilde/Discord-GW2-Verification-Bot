@@ -1,7 +1,9 @@
 language: java
 services:
 - docker
-
+env:
+  global:
+      - COMMIT=${TRAVIS_COMMIT::8}
 script:
   - mvn clean compile assembly:single
 
@@ -11,7 +13,6 @@ after_success:
   - export TAG=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH ; fi`
   - docker build -t $REPO:$COMMIT -f docker/Dockerfile .
   - docker images
-  - docker tag fsp-discord-bot $DOCKER_USERNAME/fsp-discord-bot
   - docker tag $REPO:$COMMIT $REPO:$TAG
   - docker tag $REPO:$COMMIT $REPO:travis-$TRAVIS_BUILD_NUMBER
   - docker push $REPO
