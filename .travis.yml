@@ -4,8 +4,13 @@ services:
 
 script:
   - mvn clean compile assembly:single
+
+after_success:
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-  - docker build -t fsp-discord-bot -f docker/Dockerfile .
-  - docker images
+  - export REPO=$DOCKER_USERNAME/fsp-discord-bot
+  - export TAG=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH ; fi`
+  - docker build -t $REPO:$COMMIT -f docker/Dockerfile .
   - docker tag fsp-discord-bot $DOCKER_USERNAME/fsp-discord-bot
-  - docker push $DOCKER_USERNAME/fsp-discord-bot
+  - docker tag $REPO:$COMMIT $REPO:$TAG
+  - docker tag $REPO:$COMMIT $REPO:travis-$TRAVIS_BUILD_NUMBER
+  - docker push $REPO
