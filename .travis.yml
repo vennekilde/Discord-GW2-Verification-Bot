@@ -2,5 +2,10 @@ language: java
 services:
 - docker
 
-mvn package
-docker build docker
+script:
+  - mvn package
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  - docker build -t fsp-discord-bot docker
+  - docker images
+  - docker tag fsp-discord-bot $DOCKER_USERNAME/fsp-discord-bot
+  - docker push $DOCKER_USERNAME/fsp-discord-bot
