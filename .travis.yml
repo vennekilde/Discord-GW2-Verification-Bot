@@ -3,7 +3,7 @@ services:
 - docker
 
 script:
-  - mvn package
+  - mvn clean compile assembly:single
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
   - docker build -t fsp-discord-bot -f docker/Dockerfile .
   - docker images
