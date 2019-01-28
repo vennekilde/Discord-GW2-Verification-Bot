@@ -31,7 +31,6 @@ import net.dv8tion.jda.core.JDA;
 import net.dv8tion.jda.core.JDABuilder;
 import net.dv8tion.jda.core.entities.Guild;
 import net.dv8tion.jda.core.entities.Member;
-import net.dv8tion.jda.core.entities.Message;
 import net.dv8tion.jda.core.entities.MessageHistory;
 import net.dv8tion.jda.core.entities.Role;
 import net.dv8tion.jda.core.entities.TextChannel;
@@ -42,7 +41,6 @@ import net.dv8tion.jda.core.events.guild.member.GuildMemberRoleAddEvent;
 import net.dv8tion.jda.core.events.guild.member.GuildMemberRoleRemoveEvent;
 import net.dv8tion.jda.core.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.core.events.message.react.GenericMessageReactionEvent;
-import net.dv8tion.jda.core.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.core.hooks.ListenerAdapter;
 import net.dv8tion.jda.core.requests.RequestFuture;
 import net.dv8tion.jda.core.requests.restaction.AuditableRestAction;
@@ -62,6 +60,8 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     private static final String LINKED_WORLD_ROLE_ID = "182812235280678913";
     private static final String TEMP_HOME_WORLD_ROLE_ID = "451360523066540032";
     private static final String TEMP_LINKED_WORLD_ROLE_ID = "451360652875923457";
+    private static final String DJ_ROLE_ID = "482569992613920788";
+
 //    private static final String MUSIC_BOT_ROLE_NAME = "182813018919272448";
     private static final String GUILD_ID = "174512426056810497";
     private static final String WELCOME_CHANNEL = "529635390164959232";
@@ -76,6 +76,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     private Role linkedWorldRole = null;
     private Role tempHomeWorldRole = null;
     private Role tempLinkedWorldRole = null;
+    private Role djRole = null;
 //    private Role musicBotRole = null;
     private JDA discordAPI;
     private ScheduledFuture<?> refreshSchedule;
@@ -152,6 +153,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             linkedWorldRole = guild.getRoleById(LINKED_WORLD_ROLE_ID);
             tempHomeWorldRole = guild.getRoleById(TEMP_HOME_WORLD_ROLE_ID);
             tempLinkedWorldRole = guild.getRoleById(TEMP_LINKED_WORLD_ROLE_ID);
+            djRole = guild.getRoleById(DJ_ROLE_ID);
 //            musicBotRole = guild.getRoleById(MUSIC_BOT_ROLE_NAME);
         }
     }
@@ -454,7 +456,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 case ACCESS_GRANTED_HOME_WORLD:
                     if (!accessStatus.isMusicBot()) {
                         //Access is primary and not a music bot
-                        addRoleToUserIfNotOwned(member, rolesForUser, homeWorldRole);
+                        addRoleToUserIfNotOwned(member, rolesForUser, homeWorldRole, djRole);
                         removeRoleFromUserIfOwned(member, rolesForUser, linkedWorldRole, tempHomeWorldRole, tempLinkedWorldRole/*, musicBotRole*/);
                     } else {
                         //Access is granted trough another user and is a music bot
@@ -477,7 +479,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 case ACCESS_GRANTED_LINKED_WORLD:
                     if (!accessStatus.isMusicBot()) {
                         //Access is primary and not a music bot
-                        addRoleToUserIfNotOwned(member, rolesForUser, linkedWorldRole);
+                        addRoleToUserIfNotOwned(member, rolesForUser, linkedWorldRole, djRole);
                         removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, tempHomeWorldRole, tempLinkedWorldRole/*, musicBotRole*/);
                     } else {
                         //Access is granted trough another user and is a music bot
@@ -502,7 +504,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 case ACCESS_DENIED_BANNED:
                 case ACCESS_DENIED_EXPIRED:
                 case ACCESS_DENIED_INVALID_WORLD:
-                    removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempHomeWorldRole, tempLinkedWorldRole/*, musicBotRole*/);
+                    removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempHomeWorldRole, tempLinkedWorldRole, djRole/*, musicBotRole*/);
                     break;
                 case COULD_NOT_CONNECT:
                     break;
