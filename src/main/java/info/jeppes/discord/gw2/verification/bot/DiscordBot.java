@@ -200,20 +200,20 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 
     @Override
     public void onGenericMessageReaction(GenericMessageReactionEvent event) {
-        if (event instanceof MessageReactionAddEvent && event.getChannel().getIdLong() == 481570753100120095L) {
-            websiteConnector.SetUserServiceLinkAttribute(
-                    event.getUser().getIdLong(),
-                    "poll-" + event.getMessageIdLong(),
-                    String.valueOf(event.getReactionEmote().getName().hashCode()));
-
-            LOGGER.info("User {} voted {}", event.getUser().getId(), event.getReactionEmote().getName().hashCode());
-            Message message = event.getChannel().getMessageById(event.getMessageId()).complete();
-            message.getReactions().forEach((reaction) -> {
-//                if (!event.getReaction().getReactionEmote().getName().equals(reaction.getReactionEmote().getName())) {
-                reaction.removeReaction(event.getUser()).complete();
-//                }
-            });
-        }
+//        if (event instanceof MessageReactionAddEvent && event.getChannel().getIdLong() == 481570753100120095L) {
+//            websiteConnector.SetUserServiceLinkAttribute(
+//                    event.getUser().getIdLong(),
+//                    "poll-" + event.getMessageIdLong(),
+//                    String.valueOf(event.getReactionEmote().getName().hashCode()));
+//
+//            LOGGER.info("User {} voted {}", event.getUser().getId(), event.getReactionEmote().getName().hashCode());
+//            Message message = event.getChannel().getMessageById(event.getMessageId()).complete();
+//            message.getReactions().forEach((reaction) -> {
+////                if (!event.getReaction().getReactionEmote().getName().equals(reaction.getReactionEmote().getName())) {
+//                reaction.removeReaction(event.getUser()).complete();
+////                }
+//            });
+//        }
     }
 
     public void sendVerifyMessageCheckAccess(User user) {
