@@ -555,10 +555,14 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             final StringBuilder rolesStr = new StringBuilder();
             member.getUser().openPrivateChannel().queue((channel) -> {
                 rolesToAssign.forEach((role) -> {
-                    rolesStr.append("\n - ").append(role.getName());
+                    if (role != djRole) {
+                        rolesStr.append("\n - ").append(role.getName());
+                    }
                 });
-                MessageAction message = channel.sendMessage("You have been added to the following roles on Discord server \"" + member.getGuild().getName() + "\"" + rolesStr.toString());
-                message.submit();
+                if (rolesStr.length() != 0) {
+                    MessageAction message = channel.sendMessage("You have been added to the following roles on Discord server \"" + member.getGuild().getName() + "\"" + rolesStr.toString());
+                    message.submit();
+                }
             });
         }
         return result;
