@@ -1,0 +1,3 @@
+[submodule "gw2verify-api-client-java"]
+	path = gw2verify-api-client-java
+	url = https://github.com/vennekilde/gw2verify-api-client-java.git
