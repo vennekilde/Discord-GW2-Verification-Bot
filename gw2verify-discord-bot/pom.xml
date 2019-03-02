@@ -34,7 +34,7 @@
         </dependency>
         <dependency>
             <groupId>com.farshiverpeaks</groupId>
-            <artifactId>GW2VerifyClientAPI</artifactId>
+            <artifactId>gw2verify-api-client-java</artifactId>
             <version>1.0</version>
         </dependency>
     </dependencies>
