@@ -5,30 +5,43 @@
  */
 package info.jeppes.discord.gw2.verification.bot;
 
+import com.farshiverpeaks.gw2verifyclient.api.GuildWars2VerificationAPIClient;
+import com.farshiverpeaks.gw2verifyclient.exceptions.GuildWars2VerificationAPIException;
+import com.farshiverpeaks.gw2verifyclient.model.APIKeyData;
+import com.farshiverpeaks.gw2verifyclient.model.TemporaryData;
+import com.farshiverpeaks.gw2verifyclient.model.VerificationStatus;
+import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.apikey.model.ApikeyPUTHeader;
+import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.apikey.model.ApikeyPUTQueryParam;
+import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.properties.model.PropertiesPUTHeader;
+import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.properties.model.PropertiesPUTQueryParam;
+import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.verification.refresh.model.RefreshPOSTHeader;
+import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.verification.status.model.StatusGETHeader;
+import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.verification.status.model.StatusGETQueryParam;
+import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.verification.temporary.model.TemporaryPUTHeader;
 import info.jeppes.discord.gw2.verification.bot.utils.TimeUtils;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.ResourceBundle;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.security.auth.DestroyFailedException;
 import javax.security.auth.Destroyable;
 import javax.security.auth.login.LoginException;
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
 import net.dv8tion.jda.core.AccountType;
 import net.dv8tion.jda.core.JDA;
 import net.dv8tion.jda.core.JDABuilder;
+import net.dv8tion.jda.core.entities.ChannelType;
 import net.dv8tion.jda.core.entities.Guild;
 import net.dv8tion.jda.core.entities.Member;
 import net.dv8tion.jda.core.entities.MessageHistory;
@@ -45,7 +58,7 @@ import net.dv8tion.jda.core.hooks.ListenerAdapter;
 import net.dv8tion.jda.core.requests.RequestFuture;
 import net.dv8tion.jda.core.requests.restaction.AuditableRestAction;
 import net.dv8tion.jda.core.requests.restaction.MessageAction;
-import org.json.JSONObject;
+import org.glassfish.jersey.client.ClientProperties;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -66,10 +79,15 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     private static final String GUILD_ID = "174512426056810497";
     private static final String WELCOME_CHANNEL = "529635390164959232";
     private static final String SERVER_NAME = "Far Shiverpeaks";
+    private static final String SERVICE_ID = "2";
+
+    private static final String TEMP_HOME_WORLD = "HOME_WORLD";
+    private static final String TEMP_LINKED_WORLD = "LINKED_WORLD";
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
-    private WebsiteConnector websiteConnector;
+    private GuildWars2VerificationAPIClient apiClient;
+    private String apiAuthToken;
     private ResourceBundle config;
 
     private Role homeWorldRole = null;
@@ -89,10 +107,23 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         scheduledRefreshes = new LinkedList();
         userRefreshingRoles = new ArrayList();
         this.config = config;
+        this.apiAuthToken = config.getString("rest_access_token");
     }
 
-    public WebsiteConnector getWebsiteConnector() {
-        return websiteConnector;
+    public GuildWars2VerificationAPIClient getAPIClient() {
+        return apiClient;
+    }
+
+    public JDA getDiscordAPI() {
+        return discordAPI;
+    }
+
+    public String getGuildId() {
+        return GUILD_ID;
+    }
+
+    public String getAPIAuthToken() {
+        return apiAuthToken;
     }
 
     public ResourceBundle getConfig() {
@@ -100,7 +131,15 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     }
 
     public void init() throws IOException {
-        websiteConnector = new WebsiteConnector(getConfig().getString("base_rest_url"));
+        apiClient = new GuildWars2VerificationAPIClient(config.getString("base_rest_url")) {
+            @Override
+            protected Client getClient() {
+                final Client client = ClientBuilder.newClient();
+                client.property(ClientProperties.CONNECT_TIMEOUT, 5000);
+                client.property(ClientProperties.READ_TIMEOUT, 5000);
+                return client;
+            }
+        };
 
         try {
             discordAPI = new JDABuilder(AccountType.BOT)
@@ -108,32 +147,6 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     .addEventListener(this)
                     .buildBlocking();
             discordAPI.setAutoReconnect(true);
-
-            if (refreshSchedule == null) {
-                refreshSchedule = scheduler.schedule(() -> {
-                    updateRefreshSchedule();
-                    int counter = 0;
-                    while (true) {
-                        try {
-                            Long discordId = scheduledRefreshes.removeFirst();
-                            if (counter == 100) {
-                                counter = 0;
-                                updateRefreshSchedule();
-                            }
-
-                            User user = scheduledRefreshesMap.remove(discordId);
-                            updateUserRoles(user);
-                            counter++;
-
-                        } catch (NoSuchElementException ex) {
-                            updateRefreshSchedule();
-                        } catch (Exception ex) {
-                            LOGGER.error(ex.getMessage(), ex);
-                        }
-                        Thread.sleep(1000);
-                    }
-                }, 0, TimeUnit.MINUTES);
-            }
         } catch (LoginException | IllegalArgumentException | InterruptedException ex) {
             Logger.getLogger(DiscordBot.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -176,7 +189,14 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     @Override
     public void onGuildMemberJoin(GuildMemberJoinEvent event) {
         sendRulesMessage(event.getUser());
-        sendVerifyMessageCheckAccess(event.getUser());
+        try {
+            sendVerifyMessageCheckAccess(event.getUser());
+        } catch (GuildWars2VerificationAPIException ex) {
+            LOGGER.error(ex.getMessage(), ex);
+            if (ex.getError() != null && ex.getError().getSafeDisplayError() != null) {
+                sendPrivateMessage(event.getUser(), ex.getError().getSafeDisplayError());
+            }
+        }
         sendWelcomeMessage(event.getUser());
     }
 
@@ -218,15 +238,14 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 //        }
     }
 
-    public void sendVerifyMessageCheckAccess(User user) {
+    public void sendVerifyMessageCheckAccess(User user) throws GuildWars2VerificationAPIException {
         sendVerifyMessageCheckAccess(user, true);
     }
 
-    public void sendVerifyMessageCheckAccess(User user, boolean hideIfVerified) {
-        AbstractMap.SimpleEntry<String, String> userIdEntry = new AbstractMap.SimpleEntry(user.getId(), user.getName());
-        Map<String, AccessStatusData> accessStatusMap = getWebsiteConnector().getAccessStatusForUsers(userIdEntry);
-        AccessStatusData accessStatusData = accessStatusMap.get(user.getId());
-        switch (accessStatusData.getAccessStatus()) {
+    public void sendVerifyMessageCheckAccess(User user, boolean hideIfVerified) throws GuildWars2VerificationAPIException {
+        VerificationStatus accessStatusData = getStatus(user.getId(), user.getName());
+        AccessStatus accessStatus = AccessStatus.valueOf(accessStatusData.getStatus());
+        switch (accessStatus) {
             case ACCESS_GRANTED_HOME_WORLD:
             case ACCESS_GRANTED_LINKED_WORLD:
                 if (!hideIfVerified) {
@@ -272,41 +291,33 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 + "Violation of the rules shall be judged on an individual basis, though in general there will be a 3 strikes and out policy.");
     }
 
-    public void sendCurrentAccessTypeMessage(User user, AccessStatusData accessStatusData) {
+    public void sendCurrentAccessTypeMessage(User user, VerificationStatus accessStatusData) {
         String message
                 = "Your current access level\n"
-                + accessStatusData.getAccessStatus().name() + "\n\n";
+                + accessStatusData.getStatus() + "\n\n";
 
         if (accessStatusData.getExpires() > 0) {
             message += "Expires in " + TimeUtils.getTimeWWDDHHMMSSStringShort(accessStatusData.getExpires()) + "\n\n";
         }
-        if (accessStatusData.getAccessStatus() == AccessStatus.ACCESS_DENIED_BANNED && accessStatusData.getBanReason() != null && !accessStatusData.getBanReason().isEmpty()) {
+        if (AccessStatus.ACCESS_DENIED_BANNED.name().equals(accessStatusData.getStatus()) && accessStatusData.getBanReason() != null && !accessStatusData.getBanReason().isEmpty()) {
             message += "Ban reason: " + accessStatusData.getBanReason() + "\n";
         }
-        if (accessStatusData.isMusicBot()) {
-            message += "Current user is designated as a Music Bot. Primary database user id: " + accessStatusData.getMusicBotOwner() + "\n\n";
+        if (accessStatusData.getIsPrimary() != null && !accessStatusData.getIsPrimary()) {
+            message += "Current user is designated as a Music Bot. Primary database user id: " + accessStatusData.getPrimaryUserId() + "\n\n";
         }
         sendPrivateMessage(user, message);
         LOGGER.info("Sent Current Access Type message to user: {}", user.getId());
     }
 
     public void sendVerifyMessage(User user) {
-        Session session = getUniqueLinkURL(user);
-        if (session == null) {
-            return;
-        }
-        String message
-                = "Link your Discord user with your GuildWars 2 account to gain access\n"
-                + session.getSessionURL() + "\n";
+        String message = "Go to https://account.arena.net/applications and create an API key \n"
+                + "Once you have your api key, type */verify <apikey>* to verify yourself";
         sendPrivateMessage(user, message);
-        sendPrivateMessage(user,
-                "Link expires in " + TimeUtils.getTimeWWDDHHMMSSStringShort(session.getValidTo() - System.currentTimeMillis() / 1000) + "\n"
-                + "Type /verify to get a new one");
         LOGGER.info("Sent authentication message to user: {}", user.getId());
     }
 
     public void sendAlreadyVerifiedMessage(User user) {
-        sendPrivateMessage(user, "You already have access to our discord. If this is not the case, try /verify to get a new link to get access or /refresh to refresh your api data");
+        sendPrivateMessage(user, "You already have access to our discord. If this is not the case, try /refresh to refresh your api data");
     }
 
     public void sendUnknownAccessStatusMessage(User user) {
@@ -340,121 +351,174 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 
     @Override
     public void onMessageReceived(MessageReceivedEvent event) {
-        String rawContent = event.getMessage().getContentRaw();
-        LOGGER.info(event.getAuthor().getId() + ": " + rawContent);
-        String content = rawContent.toLowerCase();
-        switch (content) {
-            case "/verify":
-            case "!verify":
-            case "/key":
-            case "!key":
-                sendVerifyMessageCheckAccess(event.getAuthor(), false);
-                break;
-            case "/status":
-            case "!status":
-                AbstractMap.SimpleEntry<String, String> entry = new AbstractMap.SimpleEntry(event.getAuthor().getId(), event.getAuthor().getName());
-                Map<String, AccessStatusData> accessStatus = getWebsiteConnector().getAccessStatusForUsers(entry);
-                sendPrivateMessage(event.getAuthor(), accessStatus.get(event.getAuthor().getId()).toString());
-            case "/refresh":
-            case "!refresh":
-                updateUserRoles(event.getAuthor());
-                break;
-            case "/rules":
-            case "!rules":
-                sendRulesMessage(event.getAuthor());
-                break;
-            case "/help":
-            case "!help":
-            case "commands":
-            case "/commands":
-            case "!commands":
-                sendPrivateMessage(event.getAuthor(), "Available commands\n"
-                        + "/verify  - Provides you with a unique link that will link your Discord account with your GuildWars 2 account\n"
-                        + "/status  - Displays your current verification status\n"
-                        + "/rules   - Get a list of current discord rules\n"
-                        + "/refresh - Forces the Discord bot to refresh your verification status with the verification server (If everything works, this should do absolutely nothing)\n"
-                        + "/help    - Shows list of available commands");
-                break;
+        if (event.getAuthor().getIdLong() == getDiscordAPI().getSelfUser().getIdLong()) {
+            return;
         }
+        try {
+            String rawContent = event.getMessage().getContentRaw();
+            String name = event.getMember() != null ? event.getMember().getEffectiveName() : event.getAuthor().getName();
+            LOGGER.info(event.getChannel().getName() + " - " + event.getAuthor().getId() + ":" + name + ": " + rawContent);
+            String[] content = rawContent.split(" ");
+            switch (content[0].toLowerCase()) {
+                case "/verify":
+                case "!verify":
+                case "/apikey":
+                case "!apikey":
+                case "/key":
+                case "!key":
+                    if (content.length < 2) {
+                        sendPrivateMessage(event.getAuthor(), "**Missing api key**");
+                        sendVerifyMessage(event.getAuthor());
+                    } else {
+                        handleSetAPIKey(event, content[1]);
+                    }
+                    break;
+                case "/status":
+                case "!status":
+                    VerificationStatus status = getStatus(event.getAuthor().getId(), event.getAuthor().getName());
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("Status: ").append(status.getStatus());
+                    if (status.getExpires() != null && status.getExpires() > 0) {
+                        sb.append("Expires in : ").append(TimeUtils.getTimeWWDDHHMMSSStringShort(status.getExpires() * 1000));
+                    }
+                    if (status.getBanReason() != null) {
+                        sb.append("Ban reason : ").append(status.getBanReason());
+                    }
+                    sendPrivateMessage(event.getAuthor(), sb.toString());
+                    break;
+                case "/refresh":
+                case "!refresh":
+                    refreshAccess(event.getAuthor().getId());
+                    updateUserRoles(event.getAuthor());
+                    break;
+                case "/rules":
+                case "!rules":
+                    sendRulesMessage(event.getAuthor());
+                    break;
+                case "/help":
+                case "!help":
+                case "commands":
+                case "/commands":
+                case "!commands":
+                    handleHelp(event);
+                    break;
+                default:
+                    if (event.getChannelType() == ChannelType.PRIVATE) {
+                        if (content[0].toUpperCase().matches("^(?:[A-F\\d]{4,20}-?){8,}$")) {
+                            handleSetAPIKey(event, content[0]);
+                        } else {
+                            handleHelp(event);
+                        }
+                    }
+                    break;
+            }
+        } catch (GuildWars2VerificationAPIException ex) {
+            if (ex.getError() != null) {
+                LOGGER.error(ex.getError().getError());
+                if (ex.getError().getSafeDisplayError() != null) {
+                    sendPrivateMessage(event.getAuthor(), ex.getError().getSafeDisplayError());
+                }
+            } else {
+                LOGGER.error(ex.getMessage(), ex);
+            }
+        }
+    }
+
+    public void handleSetAPIKey(MessageReceivedEvent event, String apikey) throws GuildWars2VerificationAPIException {
+        setAPIKey(event.getAuthor().getId(), apikey, false);
+        sendPrivateMessage(event.getAuthor(), "APIKey changed to: " + apikey);
+        updateUserRoles(event.getAuthor());
+    }
+
+    public void handleHelp(MessageReceivedEvent event) {
+        sendPrivateMessage(event.getAuthor(), "Available commands\n"
+                + "/verify <apikey> - Verify yourself with an API key\n"
+                + "/status          - Displays your current verification status\n"
+                + "/rules           - Get a list of current discord rules\n"
+                + "/refresh         - Forces the Discord bot to refresh your verification status with the verification server (If everything works, this should do absolutely nothing)\n"
+                + "/help            - Shows list of available commands");
     }
 
     @Override
     public void onGuildMemberRoleAdd(GuildMemberRoleAddEvent event) {
-        onRoleUpdated(event.getMember(), event.getRoles());
+        try {
+            onRoleUpdated(event.getMember(), event.getRoles(), true);
+        } catch (GuildWars2VerificationAPIException ex) {
+            LOGGER.error(ex.getMessage(), ex);
+        }
     }
 
     @Override
     public void onGuildMemberRoleRemove(GuildMemberRoleRemoveEvent event) {
-        onRoleUpdated(event.getMember(), event.getRoles());
+        try {
+            onRoleUpdated(event.getMember(), event.getRoles(), false);
+        } catch (GuildWars2VerificationAPIException ex) {
+            LOGGER.error(ex.getMessage(), ex);
+        }
     }
 
-    public void onRoleUpdated(Member member, List<Role> roles) {
+    public void onRoleUpdated(Member member, List<Role> roles, boolean added) throws GuildWars2VerificationAPIException {
         //Do not check for users whose roles are already being updated
         if (userRefreshingRoles.contains(member.getUser().getIdLong())) {
             return;
         }
-        roles.forEach((role) -> {
+        for (Role role : roles) {
             switch (role.getId()) {
-                case HOME_WORLD_ROLE_ID:
-                case LINKED_WORLD_ROLE_ID:
                 case TEMP_HOME_WORLD_ROLE_ID:
                 case TEMP_LINKED_WORLD_ROLE_ID:
-                    AbstractMap.SimpleEntry<String, String> entry = new AbstractMap.SimpleEntry(member.getUser().getId(), member.getNickname());
-                    Map<String, AccessStatusData> accessStatuses = getWebsiteConnector().getAccessStatusForUsers(entry);
+                    if (added) {
+                        VerificationStatus accessStatusData = getStatus(member.getUser().getId(), member.getNickname());
 
-                    AccessStatusData accessStatus = accessStatuses.get(entry.getKey());
-
-                    boolean givenTempAccess = checkIfReceivedTemporaryAccess(member.getUser(), accessStatus);
-                    //Refresh data from website
-                    //TODO Consider not doing this, as the website actually informs the teamspeak
-                    //bot if a user has recieved temporary access, which causes the bot to
-                    //refresh the user data twice
-                    if (givenTempAccess) {
-                        accessStatuses = getWebsiteConnector().getAccessStatusForUsers(entry);
-                        accessStatus = accessStatuses.get(entry.getKey());
+                        boolean givenTempAccess = grantTemporaryAccess(member.getUser(), accessStatusData);
+                        //Refresh data from website
+                        //TODO Consider not doing this, as the website actually informs the teamspeak
+                        //bot if a user has recieved temporary access, which causes the bot to
+                        //refresh the user data twice
+                        if (givenTempAccess) {
+                            accessStatusData = getStatus(member.getUser().getId(), member.getNickname());
+                        }
+                        updateUserRoles(member, accessStatusData);
                     }
-                    updateUserRoles(member, accessStatus);
+                    break;
             }
-        });
+        }
     }
 
-    public Session getUniqueLinkURL(User user) {
-        return websiteConnector.createSession(user.getIdLong(), null, user.getName(), true);
-    }
-
+//    public Session getUniqueLinkURL(User user) {
+//        return apiClient.createSession(user.getIdLong(), null, user.getName(), true);
+//    }
     private final SimpleDateFormat dataFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
-    public void updateUserRoles(long discordId) {
-        discordAPI.getGuilds().forEach((guild) -> {
+    public void updateUserRoles(long discordId) throws GuildWars2VerificationAPIException {
+        for (Guild guild : discordAPI.getGuilds()) {
             if (guild != null) {
                 Member member = guild.getMemberById(discordId);
                 updateUserRoles(member);
             }
-        });
+        }
     }
 
-    public void updateUserRoles(User user) {
+    public void updateUserRoles(User user) throws GuildWars2VerificationAPIException {
         if (user == null) {
             return;
         }
-        user.getMutualGuilds().forEach((guild) -> {
+        for (Guild guild : user.getMutualGuilds()) {
             updateUserRoles(guild.getMember(user));
-        });
+        }
     }
 
-    public void updateUserRoles(Member member) {
-        AbstractMap.SimpleEntry<String, String> userIdEntry = new AbstractMap.SimpleEntry(member.getUser().getId(), member.getUser().getName());
-        Map<String, AccessStatusData> accessStatus = getWebsiteConnector().getAccessStatusForUsers(userIdEntry);
-        updateUserRoles(member, accessStatus.get(member.getUser().getId()));
+    public void updateUserRoles(Member member) throws GuildWars2VerificationAPIException {
+        VerificationStatus accessStatusData = getStatus(member.getUser().getId(), member.getUser().getName());
+        updateUserRoles(member, accessStatusData);
     }
 
-    public void updateUserRoles(Member member, AccessStatusData accessStatus) {
+    public void updateUserRoles(Member member, VerificationStatus accessStatus) {
         List<Role> rolesForUser = member.getRoles();
         userRefreshingRoles.add(member.getUser().getIdLong());
         try {
-            switch (accessStatus.getAccessStatus()) {
+            switch (AccessStatus.valueOf(accessStatus.getStatus())) {
                 case ACCESS_GRANTED_HOME_WORLD:
-                    if (!accessStatus.isMusicBot()) {
+                    if (accessStatus.getIsPrimary() == null || accessStatus.getIsPrimary()) {
                         //Access is primary and not a music bot
                         addRoleToUserIfNotOwned(member, rolesForUser, homeWorldRole, djRole);
                         removeRoleFromUserIfOwned(member, rolesForUser, linkedWorldRole, tempHomeWorldRole, tempLinkedWorldRole/*, musicBotRole*/);
@@ -477,7 +541,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 //                    }
                     break;
                 case ACCESS_GRANTED_LINKED_WORLD:
-                    if (!accessStatus.isMusicBot()) {
+                    if (accessStatus.getIsPrimary() == null || accessStatus.getIsPrimary()) {
                         //Access is primary and not a music bot
                         addRoleToUserIfNotOwned(member, rolesForUser, linkedWorldRole, djRole);
                         removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, tempHomeWorldRole, tempLinkedWorldRole/*, musicBotRole*/);
@@ -530,7 +594,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             final StringBuilder rolesStr = new StringBuilder();
             member.getUser().openPrivateChannel().queue((channel) -> {
                 rolesToRemove.forEach((role) -> {
-                    rolesStr.append("\n - ").append(role.getName());
+                    if (role != djRole) {
+                        rolesStr.append("\n - ").append(role.getName());
+                    }
                 });
                 MessageAction message = channel.sendMessage("You have been removed from the following roles on Discord server \"" + member.getGuild().getName() + "\"" + rolesStr.toString());
                 message.submit();
@@ -568,47 +634,81 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         return result;
     }
 
-    public boolean checkIfReceivedTemporaryAccess(User user, AccessStatusData accessStatusData) {
+    public boolean grantTemporaryAccess(User user, VerificationStatus accessStatusData) throws GuildWars2VerificationAPIException {
         boolean accessGiven = false;
         //Check if user already has been given access
-        int expires = accessStatusData.getExpires();
-        switch (accessStatusData.getAccessStatus()) {
+        switch (AccessStatus.valueOf(accessStatusData.getStatus())) {
             case ACCESS_GRANTED_HOME_WORLD:
-            case ACCESS_GRANTED_HOME_WORLD_TEMPORARY:
             case ACCESS_GRANTED_LINKED_WORLD:
-            case ACCESS_GRANTED_LIMKED_WORLD_TEMPORARY:
+            case ACCESS_DENIED_BANNED:
                 return false;
-            case ACCESS_DENIED_EXPIRED:
-                JSONObject attributes = accessStatusData.getAttributes();
-                if (attributes == null || !attributes.has("tempExpired") || attributes.getString("tempExpired").equals("false")) {
-                    getWebsiteConnector().SetUserServiceLinkAttribute(user.getIdLong(), "tempExpired", "true");
-                    return false;
-                }
         }
 
-        if (expires <= (System.currentTimeMillis() / 1000)) {
-            for (Guild guild : user.getMutualGuilds()) {
-                for (Role role : guild.getMember(user).getRoles()) {
-                    switch (role.getId()) {
-                        case TEMP_HOME_WORLD_ROLE_ID:
-                            //if(!shadowMode){
-                            getWebsiteConnector().grantTemporaryAccess(user.getIdLong(), user.getName(), WebsiteConnector.AccessType.HOME_SERVER);
-                            //}
-                            accessGiven = true;
-                            LOGGER.info("User " + user.getId() + " has been granted temporary access [Home World]");
-                            break;
-                        case TEMP_LINKED_WORLD_ROLE_ID:
-                            //if(!shadowMode){
-                            getWebsiteConnector().grantTemporaryAccess(user.getIdLong(), user.getName(), WebsiteConnector.AccessType.LINKED_SERVER);
-                            //}
-                            accessGiven = true;
-                            LOGGER.info("User " + user.getId() + " has been granted temporary access [Linked World]");
-                            break;
-                    }
+        for (Guild guild : user.getMutualGuilds()) {
+            for (Role role : guild.getMember(user).getRoles()) {
+                switch (role.getId()) {
+                    case TEMP_HOME_WORLD_ROLE_ID:
+                        //if(!shadowMode){
+                        grantTemporary(user.getId(), user.getName(), AccessType.HOME_WORLD.name());
+                        //}
+                        accessGiven = true;
+                        LOGGER.info("User " + user.getId() + " has been granted temporary access [Home World]");
+                        break;
+                    case TEMP_LINKED_WORLD_ROLE_ID:
+                        //if(!shadowMode){
+                        grantTemporary(user.getId(), user.getName(), AccessType.LINKED_WORLD.name());
+                        //}
+                        accessGiven = true;
+                        LOGGER.info("User " + user.getId() + " has been granted temporary access [Linked World]");
+                        break;
                 }
             }
         }
         return accessGiven;
+    }
+
+    public VerificationStatus getStatus(String userId, String displayName) throws GuildWars2VerificationAPIException {
+        StatusGETQueryParam qParams = new StatusGETQueryParam().withDisplayName(displayName);
+        StatusGETHeader headers = new StatusGETHeader(getAPIAuthToken());
+        VerificationStatus accessStatusData = getAPIClient().users
+                .serviceId(SERVICE_ID)
+                .serviceUserId(userId).verification.status.get(qParams, headers);
+        return accessStatusData;
+    }
+
+    public long grantTemporary(String userId, String displayName, String accessType) throws GuildWars2VerificationAPIException {
+        TemporaryData body = new TemporaryData()
+                .withAccessType(accessType).withDisplayName(displayName);
+        TemporaryPUTHeader headers = new TemporaryPUTHeader(getAPIAuthToken());
+        long expiresIn = getAPIClient().users
+                .serviceId(SERVICE_ID)
+                .serviceUserId(userId).verification.temporary.put(body, headers);
+        return expiresIn;
+    }
+
+    public void setUserProperty(String userId, String name, String value) throws GuildWars2VerificationAPIException {
+        PropertiesPUTQueryParam qParams = new PropertiesPUTQueryParam(name, value);
+        PropertiesPUTHeader headers = new PropertiesPUTHeader(getAPIAuthToken());
+        String response = getAPIClient().users
+                .serviceId(SERVICE_ID)
+                .serviceUserId(userId).properties.put(qParams, headers);
+    }
+
+    public VerificationStatus refreshAccess(String userId) throws GuildWars2VerificationAPIException {
+        RefreshPOSTHeader headers = new RefreshPOSTHeader(getAPIAuthToken());
+        VerificationStatus response = getAPIClient().users
+                .serviceId(SERVICE_ID)
+                .serviceUserId(userId).verification.refresh.post(headers);
+        return response;
+    }
+
+    public void setAPIKey(String userId, String apikey, boolean primary) throws GuildWars2VerificationAPIException {
+        APIKeyData body = new APIKeyData(apikey, primary);
+        ApikeyPUTHeader headers = new ApikeyPUTHeader(getAPIAuthToken());
+        ApikeyPUTQueryParam qParams = new ApikeyPUTQueryParam(false);
+        String response = getAPIClient().users
+                .serviceId(SERVICE_ID)
+                .serviceUserId(userId).apikey.put(body, qParams, headers);
     }
 
     @Override

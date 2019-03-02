@@ -5,13 +5,20 @@
  */
 package info.jeppes.discord.gw2.verification.bot;
 
-import com.sun.net.httpserver.HttpServer;
+import com.farshiverpeaks.gw2verifyclient.api.GuildWars2VerificationAPIClient;
+import com.farshiverpeaks.gw2verifyclient.model.ServiceLink;
+import com.farshiverpeaks.gw2verifyclient.model.VerificationStatus;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.PropertyResourceBundle;
 import javax.security.auth.DestroyFailedException;
+import javax.ws.rs.ProcessingException;
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
+import net.dv8tion.jda.core.entities.Guild;
+import net.dv8tion.jda.core.entities.Member;
+import org.glassfish.jersey.client.ClientProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,10 +50,41 @@ public class DiscordMain {
 
         createDiscordBot();
 
-        HttpServer server = HttpServer.create(new InetSocketAddress(8001), 0);
-        server.createContext("/discord", new RESTService());
-        server.setExecutor(null); // creates a default executor
-        server.start();
+        new Thread(() -> {
+            GuildWars2VerificationAPIClient apiClient = new GuildWars2VerificationAPIClient(config.getString("base_rest_url")) {
+                @Override
+                protected Client getClient() {
+                    final Client client = ClientBuilder.newClient();
+                    client.property(ClientProperties.CONNECT_TIMEOUT, 5000);
+                    //High timeout for polling client
+                    client.property(ClientProperties.READ_TIMEOUT, 150000);
+                    return client;
+                }
+            };
+            while (true) {
+                try {
+                    VerificationStatus status = apiClient.updates.serviceId("2").subscribe.get();
+                    LOGGER.info("Received verication update from server {}", status.toString());
+                    Guild guild = getDiscordBot().getDiscordAPI().getGuildById(getDiscordBot().getGuildId());
+                    for (ServiceLink link : status.getServiceLinks()) {
+                        if (link.getServiceId() == 2) {
+                            Member member = guild.getMemberById(link.getServiceUserId());
+                            if (member != null) {
+                                getDiscordBot().updateUserRoles(member, status);
+                            }
+                        }
+                    }
+                } catch (ProcessingException ex) {
+                    //Ignore, as it just means there was no update
+                } catch (Exception ex) {
+                    try {
+                        LOGGER.error(ex.getMessage(), ex);
+                        Thread.sleep(1000);
+                    } catch (InterruptedException ex1) {
+                    }
+                }
+            }
+        }).start();
     }
 
     public static PropertyResourceBundle getConfig() {

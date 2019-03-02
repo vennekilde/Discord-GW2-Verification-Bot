@@ -10,6 +10,7 @@ package info.jeppes.discord.gw2.verification.bot;
  * @author Jeppe Boysen Vennekilde
  */
 public enum AccessStatus {
+    ACCESS_DENIED_UNKNOWN,
     ACCESS_GRANTED_HOME_WORLD,
     ACCESS_GRANTED_LINKED_WORLD,
     ACCESS_GRANTED_HOME_WORLD_TEMPORARY,
@@ -18,6 +19,5 @@ public enum AccessStatus {
     ACCESS_DENIED_EXPIRED,
     ACCESS_DENIED_INVALID_WORLD,
     ACCESS_DENIED_BANNED,
-    ACCESS_DENIED_UNKNOWN,
     COULD_NOT_CONNECT
 }
