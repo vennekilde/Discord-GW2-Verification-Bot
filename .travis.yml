@@ -5,6 +5,9 @@ env:
   global:
       - COMMIT=${TRAVIS_COMMIT::8}
 script:
+  - cd gw2verify-api-client-java
+  - mvn clean compile
+  - cd ..
   - mvn clean compile assembly:single
 
 after_success:
