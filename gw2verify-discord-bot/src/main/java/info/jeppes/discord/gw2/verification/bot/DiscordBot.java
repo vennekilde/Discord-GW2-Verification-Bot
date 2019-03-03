@@ -8,10 +8,12 @@ package info.jeppes.discord.gw2.verification.bot;
 import com.farshiverpeaks.gw2verifyclient.api.GuildWars2VerificationAPIClient;
 import com.farshiverpeaks.gw2verifyclient.exceptions.GuildWars2VerificationAPIException;
 import com.farshiverpeaks.gw2verifyclient.model.APIKeyData;
+import com.farshiverpeaks.gw2verifyclient.model.APIKeyName;
 import com.farshiverpeaks.gw2verifyclient.model.TemporaryData;
 import com.farshiverpeaks.gw2verifyclient.model.VerificationStatus;
 import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.apikey.model.ApikeyPUTHeader;
 import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.apikey.model.ApikeyPUTQueryParam;
+import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.apikey.name.model.NameGETHeader;
 import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.properties.model.PropertiesPUTHeader;
 import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.properties.model.PropertiesPUTQueryParam;
 import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.verification.refresh.model.RefreshPOSTHeader;
@@ -256,13 +258,13 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             case ACCESS_GRANTED_LIMKED_WORLD_TEMPORARY:
                 if (!hideIfVerified) {
                     sendCurrentAccessTypeMessage(user, accessStatusData);
-                    sendVerifyMessage(user);
+                    sendVerifyMessage(user, getAPIKeyName(user.getId()));
                 }
                 break;
             case ACCESS_DENIED_ACCOUNT_NOT_LINKED:
             case ACCESS_DENIED_EXPIRED:
             case ACCESS_DENIED_INVALID_WORLD:
-                sendVerifyMessage(user);
+                sendVerifyMessage(user, getAPIKeyName(user.getId()));
                 break;
             case COULD_NOT_CONNECT:
                 sendUnableToConnectMessage(user);
@@ -309,8 +311,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         LOGGER.info("Sent Current Access Type message to user: {}", user.getId());
     }
 
-    public void sendVerifyMessage(User user) {
+    public void sendVerifyMessage(User user, String apikeyName) {
         String message = "Go to https://account.arena.net/applications and create an API key \n"
+                + "**Requirement:** You have to name your API Key \"**" + apikeyName + "\"**\n"
                 + "Once you have your api key, type */verify <apikey>* to verify yourself";
         sendPrivateMessage(user, message);
         LOGGER.info("Sent authentication message to user: {}", user.getId());
@@ -368,7 +371,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 case "!key":
                     if (content.length < 2) {
                         sendPrivateMessage(event.getAuthor(), "**Missing api key**");
-                        sendVerifyMessage(event.getAuthor());
+                        sendVerifyMessage(event.getAuthor(), getAPIKeyName(event.getAuthor().getId()));
                     } else {
                         handleSetAPIKey(event, content[1]);
                     }
@@ -715,6 +718,14 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         String response = getAPIClient().users
                 .serviceId(SERVICE_ID)
                 .serviceUserId(userId).apikey.put(body, qParams, headers);
+    }
+
+    public String getAPIKeyName(String userId) throws GuildWars2VerificationAPIException {
+        NameGETHeader headers = new NameGETHeader(getAPIAuthToken());
+        APIKeyName response = getAPIClient().users
+                .serviceId(SERVICE_ID)
+                .serviceUserId(userId).apikey.name.get(headers);
+        return response.getName();
     }
 
     @Override
