@@ -3,7 +3,7 @@
 # and open the template in the editor.
 FROM openjdk:8
 
-ADD target/Discord-GW2-Verification-Bot-jar-with-dependencies.jar /app/Discord-GW2-Verification-Bot.jar
+ADD target/gw2verify-discord-jar-with-dependencies.jar /app/gw2verify-discord.jar
 
 COPY docker/discordbot-entrypoint.sh /app/discordbot-entrypoint.sh
 

@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-java -jar Discord-GW2-Verification-Bot.jar 
+java -jar gw2verify-discord.jar
