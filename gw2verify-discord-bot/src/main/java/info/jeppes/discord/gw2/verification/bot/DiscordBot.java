@@ -417,10 +417,16 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 LOGGER.error(ex.getError().getError());
                 if (ex.getError().getSafeDisplayError() != null) {
                     sendPrivateMessage(event.getAuthor(), ex.getError().getSafeDisplayError());
+                } else {
+                    sendPrivateMessage(event.getAuthor(), "Unable to communicate with verification backend");
                 }
             } else {
                 LOGGER.error(ex.getMessage(), ex);
+                sendPrivateMessage(event.getAuthor(), "Unable to communicate with verification backend");
             }
+        } catch (Throwable ex) {
+            LOGGER.error(ex.getMessage(), ex);
+            sendPrivateMessage(event.getAuthor(), "Unable to communicate with verification backend");
         }
     }
 
