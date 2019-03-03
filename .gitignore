@@ -51,4 +51,4 @@ hs_err_pid*
 /application/target/
 /asteroids/target/
 
-config\.properties
+/gw2verify-discord-bot/config.properties
