@@ -313,7 +313,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 
     public void sendVerifyMessage(User user, String apikeyName) {
         String message = "Go to https://account.arena.net/applications and create an API key \n"
-                + "**Requirement:** You have to name your API Key \"**" + apikeyName + "\"**\n"
+                + "**Requirement:** You have to name your API Key **" + apikeyName + "**\n\n"
                 + "Once you have your api key, type */verify <apikey>* to verify yourself";
         sendPrivateMessage(user, message);
         LOGGER.info("Sent authentication message to user: {}", user.getId());
