@@ -28,11 +28,13 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.ResourceBundle;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.security.auth.DestroyFailedException;
@@ -149,6 +151,32 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     .addEventListener(this)
                     .buildBlocking();
             discordAPI.setAutoReconnect(true);
+
+            if (refreshSchedule == null) {
+                refreshSchedule = scheduler.schedule(() -> {
+                    updateRefreshSchedule();
+                    int counter = 0;
+                    while (true) {
+                        try {
+                            Long discordId = scheduledRefreshes.removeFirst();
+                            if (counter == 100) {
+                                counter = 0;
+                                updateRefreshSchedule();
+                            }
+
+                            User user = scheduledRefreshesMap.remove(discordId);
+                            updateUserRoles(user);
+                            counter++;
+
+                        } catch (NoSuchElementException ex) {
+                            updateRefreshSchedule();
+                        } catch (Exception ex) {
+                            LOGGER.error(ex.getMessage(), ex);
+                        }
+                        Thread.sleep(1000);
+                    }
+                }, 0, TimeUnit.MINUTES);
+            }
         } catch (LoginException | IllegalArgumentException | InterruptedException ex) {
             Logger.getLogger(DiscordBot.class.getName()).log(Level.SEVERE, null, ex);
         }
