@@ -469,7 +469,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 
     public void handleHelp(MessageReceivedEvent event) {
         sendPrivateMessage(event.getAuthor(), "Available commands\n"
-                + "/verify <apikey> - Verify yourself with an API key\n"
+                + "/verify **apikey** - Verify yourself with an API key\n"
                 + "/status          - Displays your current verification status\n"
                 + "/rules           - Get a list of current discord rules\n"
                 + "/refresh         - Forces the Discord bot to refresh your verification status with the verification server (If everything works, this should do absolutely nothing)\n"
