@@ -308,8 +308,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 
     public void sendRulesMessage(User user) {
         sendPrivateMessage(user,
-                "- If you wish to join TeamSpeak aswell you can do so at: ts.farshiverpeaks.com\n\n"
-                + "- #help-desk will contain commands and general help to navigate through Discord. But if you should need help, please feel free to msg @Admin or @Moderator :)\n\n"
+                "- #help-desk will contain commands and general help to navigate through Discord. But if you should need help, please feel free to msg @Admin or @Moderator :)\n\n"
                 + "_**Discord rules:**_\n"
                 + "- Be gentle and respect everyone!\n"
                 + "- No racism, no sexual, no political, no religious comments (It’s allowed to discuss about in certain forum part with productive content)\n"
