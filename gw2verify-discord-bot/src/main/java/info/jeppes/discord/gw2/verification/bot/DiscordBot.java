@@ -39,6 +39,8 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.security.auth.DestroyFailedException;
 import javax.security.auth.Destroyable;
 import javax.security.auth.login.LoginException;
@@ -511,7 +513,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 case TEMP_HOME_WORLD_ROLE_ID:
                 case TEMP_LINKED_WORLD_ROLE_ID:
                     if (added) {
-                        VerificationStatus accessStatusData = getStatus(member.getUser().getId(), member.getNickname());
+                        VerificationStatus accessStatusData = getStatus(member.getUser().getId(), member.getEffectiveName());
 
                         boolean givenTempAccess = grantTemporaryAccess(member.getUser(), accessStatusData);
                         //Refresh data from website
@@ -519,24 +521,50 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                         //bot if a user has recieved temporary access, which causes the bot to
                         //refresh the user data twice
                         if (givenTempAccess) {
-                            accessStatusData = getStatus(member.getUser().getId(), member.getNickname());
+                            accessStatusData = getStatus(member.getUser().getId(), member.getEffectiveName());
                         }
                         updateUserRoles(member, accessStatusData);
                     }
                     break;
                 default:
                     if (added) {
-                        if (role.getName().matches("\\[.*?\\].*")) {
-                            String guildName = role.getName().replaceFirst("\\[.*?\\] ", "");
+                        if (role.getName().matches("^\\[.*?\\].*")) {
+                            String guildName = role.getName().replaceFirst("^\\[.*?\\] ", "");
                             try {
                                 JSONObject json = new JSONObject(IOUtils.toString(new URL("https://api.guildwars2.com/v1/guild_details.json?guild_name=" + guildName.replaceAll(" ", "%20")), Charset.forName("UTF-8")));
                                 String guildId = json.getString("guild_id");
-                                VerificationStatus status = getStatus(member.getUser().getId(), member.getNickname());
+                                VerificationStatus status = getStatus(member.getUser().getId(), member.getEffectiveName());
                                 Map<String, Object> accountData = (Map<String, Object>) status.getAdditionalProperties().get("AccountData");
                                 if (accountData != null) {
                                     List<String> guilds = (List<String>) accountData.get("guilds");
                                     if (!guilds.contains(guildId)) {
                                         AuditableRestAction<Void> action = member.getGuild().getController().removeRolesFromMember(member, role);
+                                        action.submit();
+                                    } else {
+                                        // Rename user
+                                        Pattern p = Pattern.compile("^\\[.*\\]");
+                                        Matcher roleTagMatch = p.matcher(role.getName());
+                                        if (!roleTagMatch.find()) {
+                                            throw new RuntimeException();
+                                        }
+                                        String roleTag = roleTagMatch.group();
+                                        Matcher match = p.matcher(member.getEffectiveName());
+                                        AuditableRestAction<Void> action;
+                                        if (match.find()) {
+                                            // Replace existing tag
+                                            action = member.getGuild().getController().setNickname(member, match.replaceAll(roleTag));
+                                        } else {
+                                            action = member.getGuild().getController().setNickname(member, roleTag + " " + member.getEffectiveName());
+                                        }
+                                        action.submit();
+
+                                        List<Role> rolesToRemove = new ArrayList();
+                                        member.getRoles().forEach((r) -> {
+                                            if (!r.getId().equals(role.getId()) && r.getName().matches("^\\[.*?\\].*")) {
+                                                rolesToRemove.add(r);
+                                            }
+                                        });
+                                        action = member.getGuild().getController().removeRolesFromMember(member, rolesToRemove);
                                         action.submit();
                                     }
                                 }
