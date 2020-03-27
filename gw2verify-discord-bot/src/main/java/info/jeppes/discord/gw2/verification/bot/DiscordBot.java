@@ -22,6 +22,8 @@ import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user
 import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.verification.temporary.model.TemporaryPUTHeader;
 import info.jeppes.discord.gw2.verification.bot.utils.TimeUtils;
 import java.io.IOException;
+import java.net.URL;
+import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,6 +44,7 @@ import javax.security.auth.Destroyable;
 import javax.security.auth.login.LoginException;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
+import me.xhsun.guildwars2wrapper.GuildWars2;
 import net.dv8tion.jda.core.AccountType;
 import net.dv8tion.jda.core.JDA;
 import net.dv8tion.jda.core.JDABuilder;
@@ -62,7 +65,9 @@ import net.dv8tion.jda.core.hooks.ListenerAdapter;
 import net.dv8tion.jda.core.requests.RequestFuture;
 import net.dv8tion.jda.core.requests.restaction.AuditableRestAction;
 import net.dv8tion.jda.core.requests.restaction.MessageAction;
+import org.apache.commons.io.IOUtils;
 import org.glassfish.jersey.client.ClientProperties;
+import org.json.JSONObject;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -90,6 +95,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
+    private GuildWars2 gw2api;
     private GuildWars2VerificationAPIClient apiClient;
     private String apiAuthToken;
     private ResourceBundle config;
@@ -112,6 +118,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         userRefreshingRoles = new ArrayList();
         this.config = config;
         this.apiAuthToken = config.getString("rest_access_token");
+        gw2api = GuildWars2.getInstance();
     }
 
     public GuildWars2VerificationAPIClient getAPIClient() {
@@ -498,6 +505,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         if (userRefreshingRoles.contains(member.getUser().getIdLong())) {
             return;
         }
+
         for (Role role : roles) {
             switch (role.getId()) {
                 case TEMP_HOME_WORLD_ROLE_ID:
@@ -514,6 +522,28 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                             accessStatusData = getStatus(member.getUser().getId(), member.getNickname());
                         }
                         updateUserRoles(member, accessStatusData);
+                    }
+                    break;
+                default:
+                    if (added) {
+                        if (role.getName().matches("\\[.*?\\].*")) {
+                            String guildName = role.getName().replaceFirst("\\[.*?\\] ", "");
+                            try {
+                                JSONObject json = new JSONObject(IOUtils.toString(new URL("https://api.guildwars2.com/v1/guild_details.json?guild_name=" + guildName.replaceAll(" ", "%20")), Charset.forName("UTF-8")));
+                                String guildId = json.getString("guild_id");
+                                VerificationStatus status = getStatus(member.getUser().getId(), member.getNickname());
+                                Map<String, Object> accountData = (Map<String, Object>) status.getAdditionalProperties().get("AccountData");
+                                if (accountData != null) {
+                                    List<String> guilds = (List<String>) accountData.get("guilds");
+                                    if (!guilds.contains(guildId)) {
+                                        AuditableRestAction<Void> action = member.getGuild().getController().removeRolesFromMember(member, role);
+                                        action.submit();
+                                    }
+                                }
+                            } catch (IOException ex) {
+                                LOGGER.error(ex.getMessage(), ex);
+                            }
+                        }
                     }
                     break;
             }
