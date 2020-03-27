@@ -6,6 +6,7 @@
 package info.jeppes.discord.gw2.verification.bot;
 
 import com.farshiverpeaks.gw2verifyclient.api.GuildWars2VerificationAPIClient;
+import com.farshiverpeaks.gw2verifyclient.exceptions.GuildWars2VerificationAPIException;
 import com.farshiverpeaks.gw2verifyclient.model.ServiceLink;
 import com.farshiverpeaks.gw2verifyclient.model.VerificationStatus;
 import java.io.File;
@@ -76,11 +77,14 @@ public class DiscordMain {
                     }
                 } catch (ProcessingException ex) {
                     //Ignore, as it just means there was no update
-                } catch (Exception ex) {
-                    try {
-                        LOGGER.error(ex.getMessage(), ex);
-                        Thread.sleep(1000);
-                    } catch (InterruptedException ex1) {
+                } catch (GuildWars2VerificationAPIException ex) {
+                    // Ignore timeout exceptions
+                    if (ex.getStatusCode() != 408) {
+                        try {
+                            LOGGER.error(ex.getMessage(), ex);
+                            Thread.sleep(1000);
+                        } catch (InterruptedException ex1) {
+                        }
                     }
                 }
             }
