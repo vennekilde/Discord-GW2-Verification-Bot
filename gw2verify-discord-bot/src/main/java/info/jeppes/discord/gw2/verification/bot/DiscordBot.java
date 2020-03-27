@@ -528,8 +528,8 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     break;
                 default:
                     if (added) {
-                        if (role.getName().matches("^\\[.*?\\].*")) {
-                            String guildName = role.getName().replaceFirst("^\\[.*?\\] ", "");
+                        if (role.getName().matches("\\[.*?\\].*")) {
+                            String guildName = role.getName().replaceFirst("\\[.*?\\] ", "");
                             try {
                                 JSONObject json = new JSONObject(IOUtils.toString(new URL("https://api.guildwars2.com/v1/guild_details.json?guild_name=" + guildName.replaceAll(" ", "%20")), Charset.forName("UTF-8")));
                                 String guildId = json.getString("guild_id");
@@ -542,7 +542,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                                         action.submit();
                                     } else {
                                         // Rename user
-                                        Pattern p = Pattern.compile("^\\[.*\\]");
+                                        Pattern p = Pattern.compile("\\[.*\\]");
                                         Matcher roleTagMatch = p.matcher(role.getName());
                                         if (!roleTagMatch.find()) {
                                             throw new RuntimeException();
@@ -560,7 +560,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 
                                         List<Role> rolesToRemove = new ArrayList();
                                         member.getRoles().forEach((r) -> {
-                                            if (!r.getId().equals(role.getId()) && r.getName().matches("^\\[.*?\\].*")) {
+                                            if (!r.getId().equals(role.getId()) && r.getName().matches("\\[.*?\\].*")) {
                                                 rolesToRemove.add(r);
                                             }
                                         });
