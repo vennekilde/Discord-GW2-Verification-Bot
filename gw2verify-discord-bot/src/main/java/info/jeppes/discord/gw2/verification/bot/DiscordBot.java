@@ -527,9 +527,11 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     }
                     break;
                 default:
-                    if (added) {
-                        if (role.getName().matches("\\[.*?\\].*")) {
-                            String guildName = role.getName().replaceFirst("\\[.*?\\] ", "");
+                    boolean isPrimaryGuild = role.getName().matches("\\[.*?\\].*");
+                    boolean isSecondaryGuild = role.getName().matches("\\{.*?\\}.*");
+                    if (isPrimaryGuild || isSecondaryGuild) {
+                        if (added) {
+                            String guildName = role.getName().replaceFirst("(\\[|\\{).*?(\\]|\\}) ", "");
                             try {
                                 JSONObject json = new JSONObject(IOUtils.toString(new URL("https://api.guildwars2.com/v1/guild_details.json?guild_name=" + guildName.replaceAll(" ", "%20")), Charset.forName("UTF-8")));
                                 String guildId = json.getString("guild_id");
@@ -541,36 +543,43 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                                         AuditableRestAction<Void> action = member.getGuild().getController().removeRolesFromMember(member, role);
                                         action.submit();
                                     } else {
-                                        // Rename user
-                                        Pattern p = Pattern.compile("\\[.*\\]");
-                                        Matcher roleTagMatch = p.matcher(role.getName());
-                                        if (!roleTagMatch.find()) {
-                                            throw new RuntimeException();
-                                        }
-                                        String roleTag = roleTagMatch.group();
-                                        Matcher match = p.matcher(member.getEffectiveName());
-                                        AuditableRestAction<Void> action;
-                                        if (match.find()) {
-                                            // Replace existing tag
-                                            action = member.getGuild().getController().setNickname(member, match.replaceAll(roleTag));
-                                        } else {
-                                            action = member.getGuild().getController().setNickname(member, roleTag + " " + member.getEffectiveName());
-                                        }
-                                        action.submit();
-
-                                        List<Role> rolesToRemove = new ArrayList();
-                                        member.getRoles().forEach((r) -> {
-                                            if (!r.getId().equals(role.getId()) && r.getName().matches("\\[.*?\\].*")) {
-                                                rolesToRemove.add(r);
+                                        if (isPrimaryGuild) {
+                                            // Rename user
+                                            Pattern p = Pattern.compile("\\[.*\\]");
+                                            Matcher roleTagMatch = p.matcher(role.getName());
+                                            if (!roleTagMatch.find()) {
+                                                throw new RuntimeException();
                                             }
-                                        });
-                                        action = member.getGuild().getController().removeRolesFromMember(member, rolesToRemove);
-                                        action.submit();
+                                            String roleTag = roleTagMatch.group();
+                                            Matcher match = p.matcher(member.getEffectiveName());
+                                            AuditableRestAction<Void> action;
+                                            if (match.find()) {
+                                                // Replace existing tag
+                                                action = member.getGuild().getController().setNickname(member, match.replaceAll(roleTag));
+                                            } else {
+                                                action = member.getGuild().getController().setNickname(member, roleTag + " " + member.getEffectiveName());
+                                            }
+                                            action.submit();
+
+                                            // remove other primary roles
+                                            List<Role> rolesToRemove = new ArrayList();
+                                            member.getRoles().forEach((r) -> {
+                                                if (!r.getId().equals(role.getId()) && r.getName().matches("\\[.*?\\].*")) {
+                                                    rolesToRemove.add(r);
+                                                }
+                                            });
+                                            action = member.getGuild().getController().removeRolesFromMember(member, rolesToRemove);
+                                            action.submit();
+                                        }
                                     }
                                 }
                             } catch (IOException ex) {
                                 LOGGER.error(ex.getMessage(), ex);
                             }
+                        } else {
+                            String nickname = member.getEffectiveName().replaceFirst("\\[.*?\\] ", "");
+                            AuditableRestAction<Void> action = member.getGuild().getController().setNickname(member, nickname);
+                            action.submit();
                         }
                     }
                     break;
@@ -662,7 +671,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 case ACCESS_DENIED_BANNED:
                 case ACCESS_DENIED_EXPIRED:
                 case ACCESS_DENIED_INVALID_WORLD:
-                    removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempHomeWorldRole, tempLinkedWorldRole, djRole/*, musicBotRole*/);
+                    Role[] rolesForUserArray = new Role[rolesForUser.size()];
+                    removeRoleFromUserIfOwned(member, rolesForUser, (Role[]) rolesForUser.toArray(rolesForUserArray));
+                    //removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempHomeWorldRole, tempLinkedWorldRole, djRole/*, musicBotRole*/);
                     break;
                 case COULD_NOT_CONNECT:
                     break;
