@@ -708,11 +708,11 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                         if (accountData != null) {
                             List<String> guilds = (List<String>) accountData.get("guilds");
                             if (!guilds.contains(guildId)) {
-                                removeGuildRole(member, role.getName());
+                                removeGuildRole(member, role);
                                 LOGGER.info("Removing " + member.getEffectiveName() + " from " + role.getName());
                             }
                         } else {
-                            removeGuildRole(member, role.getName());
+                            removeGuildRole(member, role);
                             LOGGER.info("Removing " + member.getEffectiveName() + " from " + role.getName());
                         }
                     }
@@ -955,6 +955,15 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             action = member.getGuild().getController().setNickname(member, nickname);
             action.submit();
         }
+    }
+
+    private void removeGuildRole(Member member, Role role) {
+        AuditableRestAction<Void> action = member.getGuild().getController().removeRolesFromMember(member, role);
+        action.submit();
+
+        String nickname = member.getEffectiveName().replaceFirst("^\\[.*?\\] ", "");
+        action = member.getGuild().getController().setNickname(member, nickname);
+        action.submit();
     }
 
     public String getGuildNameFromRole(String role) {
