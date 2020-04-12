@@ -22,6 +22,7 @@ import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user
 import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.verification.temporary.model.TemporaryPUTHeader;
 import info.jeppes.discord.gw2.verification.bot.utils.TimeUtils;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
@@ -114,10 +115,15 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     private Map<Long, User> scheduledRefreshesMap;
     private List<Long> userRefreshingRoles;
 
+    private Map<String, String> guildNameCache;
+    private Map<String, String> guildIdCache;
+
     public DiscordBot(ResourceBundle config) {
         scheduledRefreshesMap = new HashMap();
         scheduledRefreshes = new LinkedList();
         userRefreshingRoles = new ArrayList();
+        guildNameCache = new HashMap();
+        guildIdCache = new HashMap();
         this.config = config;
         this.apiAuthToken = config.getString("rest_access_token");
         gw2api = GuildWars2.getInstance();
@@ -399,6 +405,18 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             LOGGER.info(event.getChannel().getName() + " - " + event.getAuthor().getId() + ":" + name + ": " + rawContent);
             String[] content = rawContent.split(" ");
             switch (content[0].toLowerCase()) {
+                case "!add":
+                    addGuildRole(event.getMessage().getMember(), content[1], true);
+                    event.getMessage().delete().submit();
+                    break;
+                case "!addsec":
+                    addGuildRole(event.getMessage().getMember(), content[1], false);
+                    event.getMessage().delete().submit();
+                    break;
+                case "!rm":
+                    removeGuildRole(event.getMessage().getMember(), content[1]);
+                    event.getMessage().delete().submit();
+                    break;
                 case "/verify":
                 case "!verify":
                 case "/apikey":
@@ -533,8 +551,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                         if (added) {
                             String guildName = role.getName().replaceFirst("(\\[|\\{).*?(\\]|\\}) ", "");
                             try {
-                                JSONObject json = new JSONObject(IOUtils.toString(new URL("https://api.guildwars2.com/v1/guild_details.json?guild_name=" + guildName.replaceAll(" ", "%20")), Charset.forName("UTF-8")));
-                                String guildId = json.getString("guild_id");
+                                String guildId = getGuildIdFromName(guildName);
                                 VerificationStatus status = getStatus(member.getUser().getId(), member.getEffectiveName());
                                 Map<String, Object> accountData = (Map<String, Object>) status.getAdditionalProperties().get("AccountData");
                                 if (accountData != null) {
@@ -671,9 +688,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 case ACCESS_DENIED_BANNED:
                 case ACCESS_DENIED_EXPIRED:
                 case ACCESS_DENIED_INVALID_WORLD:
-                    Role[] rolesForUserArray = new Role[rolesForUser.size()];
-                    removeRoleFromUserIfOwned(member, rolesForUser, (Role[]) rolesForUser.toArray(rolesForUserArray));
-                    //removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempHomeWorldRole, tempLinkedWorldRole, djRole/*, musicBotRole*/);
+                    //Role[] rolesForUserArray = new Role[rolesForUser.size()];
+                    //removeRoleFromUserIfOwned(member, rolesForUser, (Role[]) rolesForUser.toArray(rolesForUserArray));
+                    removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempHomeWorldRole, tempLinkedWorldRole, djRole/*, musicBotRole*/);
                     break;
                 case COULD_NOT_CONNECT:
                     break;
@@ -681,6 +698,29 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         } finally {
             userRefreshingRoles.remove(member.getUser().getIdLong());
         }
+        rolesForUser.forEach(role -> {
+            String guildName = getGuildNameFromRole(role.getName());
+            if (guildName != null) {
+                try {
+                    String guildId = getGuildIdFromName(guildName);
+                    if (guildId != null) {
+                        Map<String, Object> accountData = (Map<String, Object>) accessStatus.getAdditionalProperties().get("AccountData");
+                        if (accountData != null) {
+                            List<String> guilds = (List<String>) accountData.get("guilds");
+                            if (!guilds.contains(guildId)) {
+                                removeGuildRole(member, role.getName());
+                                LOGGER.info("Removing " + member.getEffectiveName() + " from " + role.getName());
+                            }
+                        } else {
+                            removeGuildRole(member, role.getName());
+                            LOGGER.info("Removing " + member.getEffectiveName() + " from " + role.getName());
+                        }
+                    }
+                } catch (IOException ex) {
+                    Logger.getLogger(DiscordBot.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        });
     }
 
     public boolean removeRoleFromUserIfOwned(Member member, List<Role> givenRoles, Role... roles) {
@@ -689,6 +729,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         for (Role role : roles) {
             if (givenRoles.contains(role)) {
                 rolesToRemove.add(role);
+                LOGGER.info("Removing " + member.getEffectiveName() + " from " + role.getName());
             }
         }
         if (rolesToRemove.size() > 0) {
@@ -831,5 +872,123 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             refreshSchedule.cancel(true);
             refreshSchedule = null;
         }
+    }
+
+    private void addGuildRole(Member member, String tag, boolean primary) {
+        String tagWithBrackets;
+        if (primary) {
+            tagWithBrackets = "^\\[" + tag + "\\]";
+        } else {
+            tagWithBrackets = "^\\{" + tag + "\\}";
+        }
+        Pattern tagMatcher = Pattern.compile(tagWithBrackets, Pattern.CASE_INSENSITIVE);
+        Role guildRole = null;
+        for (Role role : member.getGuild().getRoles()) {
+            if (tagMatcher.matcher(role.getName()).find()) {
+                guildRole = role;
+                break;
+            }
+        }
+        if (guildRole != null) {
+            String guildName = guildRole.getName().replaceFirst("^(\\[|\\{).*?(\\]|\\}) ", "");
+            try {
+                String guildId = getGuildIdFromName(guildName);
+                VerificationStatus status = getStatus(member.getUser().getId(), member.getEffectiveName());
+                Map<String, Object> accountData = (Map<String, Object>) status.getAdditionalProperties().get("AccountData");
+                if (accountData != null) {
+                    List<String> guilds = (List<String>) accountData.get("guilds");
+                    if (!guilds.contains(guildId)) {
+                        AuditableRestAction<Void> action = member.getGuild().getController().removeSingleRoleFromMember(member, guildRole);
+                        action.submit();
+                    } else {
+                        AuditableRestAction<Void> action = member.getGuild().getController().addSingleRoleToMember(member, guildRole);
+                        action.submit();
+                        if (primary) {
+                            // Rename user
+                            Pattern p = Pattern.compile("^\\[.*\\]");
+                            Matcher roleTagMatch = p.matcher(guildRole.getName());
+                            if (!roleTagMatch.find()) {
+                                throw new RuntimeException();
+                            }
+                            String roleTag = roleTagMatch.group();
+                            Matcher match = p.matcher(member.getEffectiveName());
+                            if (match.find()) {
+                                // Replace existing tag
+                                action = member.getGuild().getController().setNickname(member, match.replaceAll(roleTag));
+                            } else {
+                                action = member.getGuild().getController().setNickname(member, roleTag + " " + member.getEffectiveName());
+                            }
+                            action.submit();
+
+                            // remove other primary roles
+                            List<Role> rolesToRemove = new ArrayList();
+                            for (Role r : member.getRoles()) {
+                                if (!r.getId().equals(guildRole.getId()) && r.getName().matches("\\[.*?\\].*")) {
+                                    rolesToRemove.add(r);
+                                }
+                            }
+                            action = member.getGuild().getController().removeRolesFromMember(member, rolesToRemove);
+                            action.submit();
+                        }
+                    }
+                }
+            } catch (IOException | GuildWars2VerificationAPIException ex) {
+                LOGGER.error(ex.getMessage(), ex);
+            }
+        }
+    }
+
+    private void removeGuildRole(Member member, String tag) {
+        Pattern tagMatcher = Pattern.compile("^(\\[|\\{)" + tag + "(\\]|\\})", Pattern.CASE_INSENSITIVE);
+        List<Role> guildRoles = new ArrayList();
+        for (Role role : member.getRoles()) {
+            if (tagMatcher.matcher(role.getName()).find()) {
+                guildRoles.add(role);
+                break;
+            }
+        }
+        if (guildRoles.size() > 0) {
+            AuditableRestAction<Void> action = member.getGuild().getController().removeRolesFromMember(member, guildRoles);
+            action.submit();
+
+            String nickname = member.getEffectiveName().replaceFirst("^\\[.*?\\] ", "");
+            action = member.getGuild().getController().setNickname(member, nickname);
+            action.submit();
+        }
+    }
+
+    public String getGuildNameFromRole(String role) {
+        Pattern tagMatcher = Pattern.compile("^(\\[|\\{).*?(\\]|\\}) ", Pattern.CASE_INSENSITIVE);
+        Matcher match = tagMatcher.matcher(role);
+        if (match.find()) {
+            return match.replaceAll("");
+        }
+        return null;
+    }
+
+    public String getGuildNameFromId(String id) throws MalformedURLException, IOException {
+        String name = guildIdCache.get(id);
+        if (name == null) {
+            JSONObject json = new JSONObject(IOUtils.toString(new URL("https://api.guildwars2.com/v1/guild_details.json?guild_id=" + id), Charset.forName("UTF-8")));
+            name = json.getString("guild_name");
+            if (name != null) {
+                guildNameCache.put(name, id);
+                guildIdCache.put(id, name);
+            }
+        }
+        return name;
+    }
+
+    public String getGuildIdFromName(String name) throws MalformedURLException, IOException {
+        String id = guildNameCache.get(name);
+        if (id == null) {
+            JSONObject json = new JSONObject(IOUtils.toString(new URL("https://api.guildwars2.com/v1/guild_details.json?guild_name=" + name.replaceAll(" ", "%20")), Charset.forName("UTF-8")));
+            id = json.getString("guild_id");
+            if (id != null) {
+                guildNameCache.put(name, id);
+                guildIdCache.put(id, name);
+            }
+        }
+        return id;
     }
 }
