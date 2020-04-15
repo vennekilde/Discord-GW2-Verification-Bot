@@ -406,14 +406,26 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             String[] content = rawContent.split(" ");
             switch (content[0].toLowerCase()) {
                 case "!add":
+                    if (event.getMember() == null) {
+                        event.getChannel().sendMessage("You need to use this command on the Discord server").queue();
+                        break;
+                    }
                     addGuildRole(event.getMessage().getMember(), content[1], true);
                     event.getMessage().delete().submit();
                     break;
                 case "!addsec":
+                    if (event.getMember() == null) {
+                        event.getChannel().sendMessage("You need to use this command on the Discord server").queue();
+                        break;
+                    }
                     addGuildRole(event.getMessage().getMember(), content[1], false);
                     event.getMessage().delete().submit();
                     break;
                 case "!rm":
+                    if (event.getMember() == null) {
+                        event.getChannel().sendMessage("You need to use this command on the Discord server").queue();
+                        break;
+                    }
                     removeGuildRole(event.getMessage().getMember(), content[1]);
                     event.getMessage().delete().submit();
                     break;
@@ -929,11 +941,19 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                             }
                             action = member.getGuild().getController().removeRolesFromMember(member, rolesToRemove);
                             action.submit();
+
+                            final String guildRoleName = guildRole.getName();
+                            member.getUser().openPrivateChannel().queue((channel) -> {
+                                channel.sendMessage((primary ? "Primary" : "Secondary") + " guild set to \"" + guildRoleName + "\"").queue();
+                            });
                         }
                     }
                 }
             } catch (IOException | GuildWars2VerificationAPIException ex) {
                 LOGGER.error(ex.getMessage(), ex);
+                member.getUser().openPrivateChannel().queue((channel) -> {
+                    channel.sendMessage("Error while trying to set " + (primary ? "primary" : "secondary") + " guild with tag \"" + tag + "\"").queue();
+                });
             }
         }
     }
@@ -954,6 +974,14 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             String nickname = member.getEffectiveName().replaceFirst("^\\[.*?\\] ", "");
             action = member.getGuild().getController().setNickname(member, nickname);
             action.submit();
+
+            member.getUser().openPrivateChannel().queue((channel) -> {
+                channel.sendMessage("You have been removed from  \"" + guildRoles.get(0).getName() + "\"").queue();
+            });
+        } else {
+            member.getUser().openPrivateChannel().queue((channel) -> {
+                channel.sendMessage("You do not currently have a guild role with tag \"" + tag + "\"").queue();
+            });
         }
     }
 
