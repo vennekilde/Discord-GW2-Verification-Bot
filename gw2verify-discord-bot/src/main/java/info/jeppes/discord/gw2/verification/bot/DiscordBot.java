@@ -406,28 +406,28 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             String[] content = rawContent.split(" ");
             switch (content[0].toLowerCase()) {
                 case "!add":
+                    event.getMessage().delete().submit();
                     if (event.getMember() == null) {
                         event.getChannel().sendMessage("You need to use this command on the Discord server").queue();
                         break;
                     }
                     addGuildRole(event.getMessage().getMember(), content[1], true);
-                    event.getMessage().delete().submit();
                     break;
                 case "!addsec":
+                    event.getMessage().delete().submit();
                     if (event.getMember() == null) {
                         event.getChannel().sendMessage("You need to use this command on the Discord server").queue();
                         break;
                     }
                     addGuildRole(event.getMessage().getMember(), content[1], false);
-                    event.getMessage().delete().submit();
                     break;
                 case "!rm":
+                    event.getMessage().delete().submit();
                     if (event.getMember() == null) {
                         event.getChannel().sendMessage("You need to use this command on the Discord server").queue();
                         break;
                     }
                     removeGuildRole(event.getMessage().getMember(), content[1]);
-                    event.getMessage().delete().submit();
                     break;
                 case "/verify":
                 case "!verify":
