@@ -902,7 +902,8 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             }
         }
         if (guildRole != null) {
-            String guildName = guildRole.getName().replaceFirst("^(\\[|\\{).*?(\\]|\\}) ", "");
+            final String guildRoleName = guildRole.getName();
+            final String guildName = guildRoleName.replaceFirst("^(\\[|\\{).*?(\\]|\\}) ", "");
             try {
                 String guildId = getGuildIdFromName(guildName);
                 VerificationStatus status = getStatus(member.getUser().getId(), member.getEffectiveName());
@@ -918,7 +919,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                         if (primary) {
                             // Rename user
                             Pattern p = Pattern.compile("^\\[.*\\]");
-                            Matcher roleTagMatch = p.matcher(guildRole.getName());
+                            Matcher roleTagMatch = p.matcher(guildRoleName);
                             if (!roleTagMatch.find()) {
                                 throw new RuntimeException();
                             }
@@ -942,12 +943,15 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                             action = member.getGuild().getController().removeRolesFromMember(member, rolesToRemove);
                             action.submit();
 
-                            final String guildRoleName = guildRole.getName();
                             member.getUser().openPrivateChannel().queue((channel) -> {
                                 channel.sendMessage((primary ? "Primary" : "Secondary") + " guild set to \"" + guildRoleName + "\"").queue();
                             });
                         }
                     }
+                } else {
+                    member.getUser().openPrivateChannel().queue((channel) -> {
+                        channel.sendMessage("You need to be verified to join guild role \"" + guildRoleName + "\"\nType !verify for more info").queue();
+                    });
                 }
             } catch (IOException | GuildWars2VerificationAPIException ex) {
                 LOGGER.error(ex.getMessage(), ex);
@@ -955,6 +959,10 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     channel.sendMessage("Error while trying to set " + (primary ? "primary" : "secondary") + " guild with tag \"" + tag + "\"").queue();
                 });
             }
+        } else {
+            member.getUser().openPrivateChannel().queue((channel) -> {
+                channel.sendMessage("Could not find any " + (primary ? "primary" : "secondary") + " guild role with tag \"" + tag + "\"").queue();
+            });
         }
     }
 
