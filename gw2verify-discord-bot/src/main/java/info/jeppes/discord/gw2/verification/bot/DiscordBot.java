@@ -48,26 +48,27 @@ import javax.security.auth.login.LoginException;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import me.xhsun.guildwars2wrapper.GuildWars2;
-import net.dv8tion.jda.core.AccountType;
-import net.dv8tion.jda.core.JDA;
-import net.dv8tion.jda.core.JDABuilder;
-import net.dv8tion.jda.core.entities.ChannelType;
-import net.dv8tion.jda.core.entities.Guild;
+import net.dv8tion.jda.api.AccountType;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.entities.ChannelType;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.core.entities.Member;
-import net.dv8tion.jda.core.entities.MessageHistory;
-import net.dv8tion.jda.core.entities.Role;
-import net.dv8tion.jda.core.entities.TextChannel;
-import net.dv8tion.jda.core.entities.User;
-import net.dv8tion.jda.core.events.ReadyEvent;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.MessageHistory;
+import net.dv8tion.jda.api.entities.Role;
+import net.dv8tion.jda.api.entities.TextChannel;
+import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.core.events.guild.member.GuildMemberJoinEvent;
-import net.dv8tion.jda.core.events.guild.member.GuildMemberRoleAddEvent;
-import net.dv8tion.jda.core.events.guild.member.GuildMemberRoleRemoveEvent;
-import net.dv8tion.jda.core.events.message.MessageReceivedEvent;
-import net.dv8tion.jda.core.events.message.react.GenericMessageReactionEvent;
+import net.dv8tion.jda.api.events.ReadyEvent;
+import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
+import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleAddEvent;
+import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleRemoveEvent;
 import net.dv8tion.jda.core.hooks.ListenerAdapter;
-import net.dv8tion.jda.core.requests.RequestFuture;
-import net.dv8tion.jda.core.requests.restaction.AuditableRestAction;
-import net.dv8tion.jda.core.requests.restaction.MessageAction;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.events.message.react.GenericMessageReactionEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.requests.restaction.MessageAction;
 import org.apache.commons.io.IOUtils;
 import org.glassfish.jersey.client.ClientProperties;
 import org.json.JSONObject;
@@ -163,8 +164,8 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         try {
             discordAPI = new JDABuilder(AccountType.BOT)
                     .setToken(getConfig().getString("discord_token"))
-                    .addEventListener(this)
-                    .buildBlocking();
+                    .addEventListeners(this)
+                    .build();
             discordAPI.setAutoReconnect(true);
 
             if (refreshSchedule == null) {
@@ -192,7 +193,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     }
                 }, 0, TimeUnit.MINUTES);
             }
-        } catch (LoginException | IllegalArgumentException | InterruptedException ex) {
+        } catch (LoginException | IllegalArgumentException ex) {
             Logger.getLogger(DiscordBot.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
@@ -251,8 +252,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         if (channel != null) {
             try {
                 MessageHistory.MessageRetrieveAction history = channel.getHistoryAfter("529644659262357526", 100);
-                RequestFuture<MessageHistory> submit = history.submit();
-                submit.get().getRetrievedHistory().forEach((message) -> {
+                history.submit().get().getRetrievedHistory().forEach((message) -> {
                     if (!message.isPinned()) {
                         message.delete().submit();
                     }
@@ -406,7 +406,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             String[] content = rawContent.split(" ");
             switch (content[0].toLowerCase()) {
                 case "!add":
-                    event.getMessage().delete().submit();
+                    event.getMessage().delete().queue();
                     if (event.getMember() == null) {
                         event.getChannel().sendMessage("You need to use this command on the Discord server").queue();
                         break;
@@ -414,7 +414,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     addGuildRole(event.getMessage().getMember(), content[1], true);
                     break;
                 case "!addsec":
-                    event.getMessage().delete().submit();
+                    event.getMessage().delete().queue();
                     if (event.getMember() == null) {
                         event.getChannel().sendMessage("You need to use this command on the Discord server").queue();
                         break;
@@ -422,7 +422,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     addGuildRole(event.getMessage().getMember(), content[1], false);
                     break;
                 case "!rm":
-                    event.getMessage().delete().submit();
+                    event.getMessage().delete().queue();
                     if (event.getMember() == null) {
                         event.getChannel().sendMessage("You need to use this command on the Discord server").queue();
                         break;
@@ -569,8 +569,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                                 if (accountData != null) {
                                     List<String> guilds = (List<String>) accountData.get("guilds");
                                     if (!guilds.contains(guildId)) {
-                                        AuditableRestAction<Void> action = member.getGuild().getController().removeRolesFromMember(member, role);
-                                        action.submit();
+                                        member.getGuild().removeRoleFromMember(member, role).queue();
                                     } else {
                                         if (isPrimaryGuild) {
                                             // Rename user
@@ -581,14 +580,12 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                                             }
                                             String roleTag = roleTagMatch.group();
                                             Matcher match = p.matcher(member.getEffectiveName());
-                                            AuditableRestAction<Void> action;
                                             if (match.find()) {
                                                 // Replace existing tag
-                                                action = member.getGuild().getController().setNickname(member, match.replaceAll(roleTag));
+                                                member.modifyNickname(match.replaceAll(roleTag)).queue();
                                             } else {
-                                                action = member.getGuild().getController().setNickname(member, roleTag + " " + member.getEffectiveName());
+                                                member.modifyNickname(roleTag + " " + member.getEffectiveName()).queue();
                                             }
-                                            action.submit();
 
                                             // remove other primary roles
                                             List<Role> rolesToRemove = new ArrayList();
@@ -597,8 +594,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                                                     rolesToRemove.add(r);
                                                 }
                                             });
-                                            action = member.getGuild().getController().removeRolesFromMember(member, rolesToRemove);
-                                            action.submit();
+                                            rolesToRemove.forEach(roleToRemove -> {
+                                                member.getGuild().removeRoleFromMember(member, roleToRemove).queue();
+                                            });
                                         }
                                     }
                                 }
@@ -607,8 +605,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                             }
                         } else {
                             String nickname = member.getEffectiveName().replaceFirst("\\[.*?\\] ", "");
-                            AuditableRestAction<Void> action = member.getGuild().getController().setNickname(member, nickname);
-                            action.submit();
+                            member.modifyNickname(nickname).queue();
                         }
                     }
                     break;
@@ -745,8 +742,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             }
         }
         if (rolesToRemove.size() > 0) {
-            AuditableRestAction<Void> action = member.getGuild().getController().removeRolesFromMember(member, rolesToRemove);
-            action.submit();
+            rolesToRemove.forEach(roleToRemove -> {
+                member.getGuild().removeRoleFromMember(member, roleToRemove).queue();
+            });
             result = true;
             //Send message to user about removed roles
             final StringBuilder rolesStr = new StringBuilder();
@@ -772,8 +770,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             }
         }
         if (rolesToAssign.size() > 0) {
-            AuditableRestAction<Void> action = member.getGuild().getController().addRolesToMember(member, rolesToAssign.toArray(new Role[rolesToAssign.size()]));
-            action.submit();
+            rolesToAssign.forEach(roleToAssign -> {
+                member.getGuild().addRoleToMember(member, roleToAssign).queue();
+            });
             result = true;
             //Send message to user about added roles
             final StringBuilder rolesStr = new StringBuilder();
@@ -911,11 +910,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 if (accountData != null) {
                     List<String> guilds = (List<String>) accountData.get("guilds");
                     if (!guilds.contains(guildId)) {
-                        AuditableRestAction<Void> action = member.getGuild().getController().removeSingleRoleFromMember(member, guildRole);
-                        action.submit();
+                        member.getGuild().removeRoleFromMember(member, guildRole).queue();
                     } else {
-                        AuditableRestAction<Void> action = member.getGuild().getController().addSingleRoleToMember(member, guildRole);
-                        action.submit();
+                        member.getGuild().addRoleToMember(member, guildRole).queue();
                         if (primary) {
                             // Rename user
                             Pattern p = Pattern.compile("^\\[.*\\]");
@@ -927,11 +924,10 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                             Matcher match = p.matcher(member.getEffectiveName());
                             if (match.find()) {
                                 // Replace existing tag
-                                action = member.getGuild().getController().setNickname(member, match.replaceAll(roleTag));
+                                member.modifyNickname(match.replaceAll(roleTag)).queue();
                             } else {
-                                action = member.getGuild().getController().setNickname(member, roleTag + " " + member.getEffectiveName());
+                                member.modifyNickname(roleTag + " " + member.getEffectiveName()).queue();
                             }
-                            action.submit();
 
                             // remove other primary roles
                             List<Role> rolesToRemove = new ArrayList();
@@ -940,8 +936,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                                     rolesToRemove.add(r);
                                 }
                             }
-                            action = member.getGuild().getController().removeRolesFromMember(member, rolesToRemove);
-                            action.submit();
+                            rolesToRemove.forEach(role -> {
+                                member.getGuild().removeRoleFromMember(member, role).queue();
+                            });
 
                             member.getUser().openPrivateChannel().queue((channel) -> {
                                 channel.sendMessage((primary ? "Primary" : "Secondary") + " guild set to \"" + guildRoleName + "\"").queue();
@@ -976,12 +973,12 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             }
         }
         if (guildRoles.size() > 0) {
-            AuditableRestAction<Void> action = member.getGuild().getController().removeRolesFromMember(member, guildRoles);
-            action.submit();
+            guildRoles.forEach(role -> {
+                member.getGuild().removeRoleFromMember(member, role).queue();
+            });
 
             String nickname = member.getEffectiveName().replaceFirst("^\\[.*?\\] ", "");
-            action = member.getGuild().getController().setNickname(member, nickname);
-            action.submit();
+            member.modifyNickname(nickname).queue();
 
             member.getUser().openPrivateChannel().queue((channel) -> {
                 channel.sendMessage("You have been removed from  \"" + guildRoles.get(0).getName() + "\"").queue();
@@ -994,12 +991,10 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     }
 
     private void removeGuildRole(Member member, Role role) {
-        AuditableRestAction<Void> action = member.getGuild().getController().removeRolesFromMember(member, role);
-        action.submit();
+        member.getGuild().removeRoleFromMember(member, role).queue();
 
         String nickname = member.getEffectiveName().replaceFirst("^\\[.*?\\] ", "");
-        action = member.getGuild().getController().setNickname(member, nickname);
-        action.submit();
+        member.modifyNickname(nickname).queue();
     }
 
     public String getGuildNameFromRole(String role) {
