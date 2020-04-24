@@ -528,6 +528,8 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         if (userLimit > 0 && userCount >= userLimit) {
             //Sucks to be this guy
             Member leastImportantMember = null;
+            //Arbitrary reasons for picking some member over another for kick
+            int leastImportantImportance = 0;
             //Attempt to kick someone, limit reached
             for (Member member : members) {
                 boolean isCommander = member.getRoles().stream().anyMatch((role) -> {
@@ -543,12 +545,19 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     continue;
                 }
 
+                // The more roles you have, the more important you are... sure lets say that
+                // Lets just sprinkle some randomness in there also
+                int importance = (int) (member.getRoles().size() + (Math.random() * 3));
+
                 //Check if the member is deaf
                 GuildVoiceState voiceState = member.getVoiceState();
                 if (voiceState != null && voiceState.isDeafened()) {
-                    LOGGER.info("[{}] {} was deafened, marked for kick", member.getId(), member.getEffectiveName());
-                    leastImportantMember = member;
-                    break;
+                    if (importance < leastImportantImportance) {
+                        LOGGER.info("[{}] {} was deafened, marked for kick. Importance: {}", member.getId(), member.getEffectiveName(), importance);
+                        leastImportantMember = member;
+                        leastImportantImportance = importance;
+                        continue;
+                    }
                 }
 
                 //Maybe they aren't deaf, but that doesn't mean they are important
@@ -564,8 +573,12 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     return false;
                 });
                 if (!isVerified) {
+                    //At least they aren't muted, so lets make them important... ish
+                    //I mean not so important we still don't kick one of them
+                    importance += 10;
                     //Make them a candidate, but if we actually find a deaf person, they will be kicked instead
                     leastImportantMember = member;
+                    leastImportantImportance = importance;
                 }
             }
             if (leastImportantMember != null) {
