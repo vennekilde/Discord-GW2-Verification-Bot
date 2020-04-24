@@ -553,7 +553,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 }
             }
             if (leastImportantMember != null) {
-                LOGGER.info("Kicked pleb [{}] {} to make space in channel", leastImportantMember.getId(), leastImportantMember.getEffectiveName(), vChannel.getName());
+                LOGGER.info("Kicked pleb [{}] {} to make space in channel {}", leastImportantMember.getId(), leastImportantMember.getEffectiveName(), vChannel.getName());
 
                 leastImportantMember.getUser().openPrivateChannel().queue((channel) -> {
                     channel.sendMessage(
