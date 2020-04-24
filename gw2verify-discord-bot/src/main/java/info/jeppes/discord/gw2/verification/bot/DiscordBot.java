@@ -53,18 +53,18 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.ChannelType;
 import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.core.entities.Member;
+import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.MessageHistory;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.entities.User;
-import net.dv8tion.jda.core.events.guild.member.GuildMemberJoinEvent;
+import net.dv8tion.jda.api.entities.VoiceChannel;
 import net.dv8tion.jda.api.events.ReadyEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleAddEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleRemoveEvent;
-import net.dv8tion.jda.core.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.events.guild.voice.GenericGuildVoiceEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.message.react.GenericMessageReactionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -512,6 +512,60 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 + "/rules           - Get a list of current discord rules\n"
                 + "/refresh         - Forces the Discord bot to refresh your verification status with the verification server (If everything works, this should do absolutely nothing)\n"
                 + "/help            - Shows list of available commands");
+    }
+
+    @Override
+    public void onGenericGuildVoice(GenericGuildVoiceEvent event) {
+        VoiceChannel vChannel = event.getVoiceState().getChannel();
+        if (vChannel == null) {
+            return;
+        }
+
+        List<Member> members = vChannel.getMembers();
+        int userCount = members.size();
+        int userLimit = vChannel.getUserLimit();
+        if (userLimit > 0 && userCount >= userLimit) {
+            //Sucks to be this guy
+            Member leastImportantMember = null;
+            //Attempt to kick someone, limit reached
+            for (Member member : members) {
+                GuildVoiceState voiceState = member.getVoiceState();
+                if (voiceState != null && voiceState.isDeafened()) {
+                    leastImportantMember = member;
+                    break;
+                }
+
+                //Maybe they aren't deaf, but that doesn't mean they are important
+                //Gotta kick those plebs to make space for the pros
+                boolean isVerified = member.getRoles().stream().anyMatch((role) -> {
+                    switch (role.getId()) {
+                        case HOME_WORLD_ROLE_ID:
+                        case LINKED_WORLD_ROLE_ID:
+                        case TEMP_HOME_WORLD_ROLE_ID:
+                        case TEMP_LINKED_WORLD_ROLE_ID:
+                            return true;
+                    }
+                    return false;
+                });
+                if (!isVerified) {
+                    //Make them a candidate, but if we actually find a deaf person, they will be kicked instead
+                    leastImportantMember = member;
+                }
+            }
+            if (leastImportantMember != null) {
+                LOGGER.info("Kicked pleb [{}] {} to make space in channel", leastImportantMember.getId(), leastImportantMember.getEffectiveName(), vChannel.getName());
+
+                leastImportantMember.getUser().openPrivateChannel().queue((channel) -> {
+                    channel.sendMessage(
+                            "You have been disconnected from voice channel \"" + vChannel.getName() + "\" to make space for other users\n"
+                            + "Reasons for being kicked:\n"
+                            + "- You were deafened\n"
+                            + "- You are not verified"
+                    ).queue();
+                });
+                vChannel.getGuild().kickVoiceMember(leastImportantMember).queue();
+            }
+        }
     }
 
     @Override
