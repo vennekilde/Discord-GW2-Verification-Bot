@@ -87,6 +87,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     private static final String TEMP_HOME_WORLD_ROLE_ID = "451360523066540032";
     private static final String TEMP_LINKED_WORLD_ROLE_ID = "451360652875923457";
     private static final String DJ_ROLE_ID = "482569992613920788";
+    private static final String COMMANDER_ROLE_ID = "182891788846104577";
 
 //    private static final String MUSIC_BOT_ROLE_NAME = "182813018919272448";
     private static final String GUILD_ID = "174512426056810497";
@@ -529,8 +530,23 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             Member leastImportantMember = null;
             //Attempt to kick someone, limit reached
             for (Member member : members) {
+                boolean isCommander = member.getRoles().stream().anyMatch((role) -> {
+                    switch (role.getId()) {
+                        case COMMANDER_ROLE_ID:
+                            return true;
+                    }
+                    return false;
+                });
+
+                // Soo to avoid stuff... we just won't kick commanders
+                if (isCommander) {
+                    continue;
+                }
+
+                //Check if the member is deaf
                 GuildVoiceState voiceState = member.getVoiceState();
                 if (voiceState != null && voiceState.isDeafened()) {
+                    LOGGER.info("[{}] {} was deafened, marked for kick", member.getId(), member.getEffectiveName());
                     leastImportantMember = member;
                     break;
                 }
