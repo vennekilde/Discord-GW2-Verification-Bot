@@ -576,9 +576,11 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     //At least they aren't muted, so lets make them important... ish
                     //I mean not so important we still don't kick one of them
                     importance += 10;
-                    //Make them a candidate, but if we actually find a deaf person, they will be kicked instead
-                    leastImportantMember = member;
-                    leastImportantImportance = importance;
+                    if (importance < leastImportantImportance) {
+                        //Make them a candidate, but if we actually find a deaf person, they will be kicked instead
+                        leastImportantMember = member;
+                        leastImportantImportance = importance;
+                    }
                 }
             }
             if (leastImportantMember != null) {
