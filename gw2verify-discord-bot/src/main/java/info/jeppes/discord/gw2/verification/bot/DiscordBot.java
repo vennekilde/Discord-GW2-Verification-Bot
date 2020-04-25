@@ -65,6 +65,8 @@ import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleAddEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleRemoveEvent;
 import net.dv8tion.jda.api.events.guild.voice.GenericGuildVoiceEvent;
+import net.dv8tion.jda.api.events.guild.voice.GuildVoiceJoinEvent;
+import net.dv8tion.jda.api.events.guild.voice.GuildVoiceMoveEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.message.react.GenericMessageReactionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -516,7 +518,22 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     }
 
     @Override
-    public void onGenericGuildVoice(GenericGuildVoiceEvent event) {
+    public void onGuildVoiceJoin(GuildVoiceJoinEvent event) {
+        handlePlebKicking(event);
+    }
+
+    @Override
+    public void onGuildVoiceMove(GuildVoiceMoveEvent event) {
+        handlePlebKicking(event);
+    }
+
+    /**
+     * Kick a pleb if the user limit is reached to ensure pro's have space to
+     * join
+     *
+     * @param event
+     */
+    public void handlePlebKicking(GenericGuildVoiceEvent event) {
         VoiceChannel vChannel = event.getVoiceState().getChannel();
         if (vChannel == null) {
             return;
@@ -531,55 +548,21 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             //Arbitrary reasons for picking some member over another for kick
             int leastImportantImportance = 0;
             //Attempt to kick someone, limit reached
-            for (Member member : members) {
-                boolean isCommander = member.getRoles().stream().anyMatch((role) -> {
-                    switch (role.getId()) {
-                        case COMMANDER_ROLE_ID:
-                            return true;
-                    }
-                    return false;
-                });
 
-                // Soo to avoid stuff... we just won't kick commanders
-                if (isCommander) {
-                    continue;
-                }
-
-                // The more roles you have, the more important you are... sure lets say that
-                // Lets just sprinkle some randomness in there also
-                int importance = (int) (member.getRoles().size() + (Math.random() * 3));
-
-                //Check if the member is deaf
-                GuildVoiceState voiceState = member.getVoiceState();
-                if (voiceState != null && voiceState.isDeafened()) {
-                    if (importance < leastImportantImportance) {
-                        LOGGER.info("[{}] {} was deafened, marked for kick. Importance: {}", member.getId(), member.getEffectiveName(), importance);
-                        leastImportantMember = member;
-                        leastImportantImportance = importance;
-                        continue;
-                    }
-                }
-
-                //Maybe they aren't deaf, but that doesn't mean they are important
-                //Gotta kick those plebs to make space for the pros
-                boolean isVerified = member.getRoles().stream().anyMatch((role) -> {
-                    switch (role.getId()) {
-                        case HOME_WORLD_ROLE_ID:
-                        case LINKED_WORLD_ROLE_ID:
-                        case TEMP_HOME_WORLD_ROLE_ID:
-                        case TEMP_LINKED_WORLD_ROLE_ID:
-                            return true;
-                    }
-                    return false;
-                });
-                if (!isVerified) {
-                    //At least they aren't muted, so lets make them important... ish
-                    //I mean not so important we still don't kick one of them
-                    importance += 10;
-                    if (importance < leastImportantImportance) {
-                        //Make them a candidate, but if we actually find a deaf person, they will be kicked instead
-                        leastImportantMember = member;
-                        leastImportantImportance = importance;
+            // Only pro's allowed when channel is full
+            if (isPleb(event.getMember())) {
+                leastImportantMember = event.getMember();
+                LOGGER.info("Pleb [{}] {} tried to rejoin full voice channel {}", leastImportantMember.getId(), leastImportantMember.getEffectiveName(), vChannel.getName());
+            } else {
+                // Alright, lets find our least important pleb and kick the sucker
+                for (Member member : members) {
+                    if (isPleb(member)) {
+                        int importance = getPlebImportanceLevel(member);
+                        if (importance < leastImportantImportance) {
+                            LOGGER.info("[{}] {} was deafened, marked for kick. Importance: {}", member.getId(), member.getEffectiveName(), importance);
+                            leastImportantMember = member;
+                            leastImportantImportance = importance;
+                        }
                     }
                 }
             }
@@ -595,8 +578,58 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     ).queue();
                 });
                 vChannel.getGuild().kickVoiceMember(leastImportantMember).queue();
+            } else {
+                LOGGER.info("Could not find any plebs to kick from voice channel {}", vChannel.getName());
             }
         }
+    }
+
+    public boolean isPleb(Member member) {
+        boolean isCommander = member.getRoles().stream().anyMatch((role) -> {
+            switch (role.getId()) {
+                case COMMANDER_ROLE_ID:
+                    return true;
+            }
+            return false;
+        });
+
+        // Soo to avoid stuff... we just won't kick commanders
+        if (isCommander) {
+            return false;
+        }
+
+        // Only plebs are deaf
+        GuildVoiceState voiceState = member.getVoiceState();
+        if (voiceState != null && voiceState.isDeafened()) {
+            return true;
+        }
+
+        boolean isVerified = member.getRoles().stream().anyMatch((role) -> {
+            switch (role.getId()) {
+                case HOME_WORLD_ROLE_ID:
+                case LINKED_WORLD_ROLE_ID:
+                case TEMP_HOME_WORLD_ROLE_ID:
+                case TEMP_LINKED_WORLD_ROLE_ID:
+                    return true;
+            }
+            return false;
+        });
+
+        return !isVerified;
+    }
+
+    public int getPlebImportanceLevel(Member member) {
+        // The more roles you have, the more important you are... sure lets say that
+        // Lets just sprinkle some randomness in there also
+        int importance = (int) (member.getRoles().size() + (Math.random() * 3));
+
+        //Check if the member is deaf
+        GuildVoiceState voiceState = member.getVoiceState();
+        if (voiceState != null && !voiceState.isDeafened()) {
+            //At least they aren't muted, so lets make them important... ish
+            importance += 10;
+        }
+        return importance;
     }
 
     @Override
