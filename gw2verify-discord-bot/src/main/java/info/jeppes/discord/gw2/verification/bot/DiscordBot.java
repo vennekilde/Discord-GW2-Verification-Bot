@@ -185,7 +185,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     while (true) {
                         try {
                             Long discordId = scheduledRefreshes.removeFirst();
-                            if (counter == 100) {
+                            if (counter == 1000) {
                                 counter = 0;
                                 updateRefreshSchedule();
                             }
@@ -237,7 +237,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
      * Update list of users that needs to be refreshed
      */
     public void updateRefreshSchedule() {
-//        LOGGER.info("Update refresh schedule");
+        LOGGER.info("Updating refresh schedule. Current users to refresh: " + scheduledRefreshes.size());
         discordAPI.getGuilds().forEach((guild) -> {
             guild.getMembers().forEach((member) -> {
                 if (!scheduledRefreshes.contains(member.getUser().getIdLong())) {
@@ -246,6 +246,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 }
             });
         });
+        LOGGER.info("Updated refresh schedule. New users to refresh: " + scheduledRefreshes.size());
     }
 
     @Override
