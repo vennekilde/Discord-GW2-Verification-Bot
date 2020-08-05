@@ -17,7 +17,6 @@ import javax.security.auth.DestroyFailedException;
 import javax.ws.rs.ProcessingException;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
-import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import org.glassfish.jersey.client.ClientProperties;
 import org.slf4j.Logger;
@@ -66,15 +65,16 @@ public class DiscordMain {
                 try {
                     VerificationStatus status = apiClient.updates.serviceId("2").subscribe.get();
                     LOGGER.info("Received verication update from server {}", status.toString());
-                    Guild guild = getDiscordBot().getDiscordAPI().getGuildById(getDiscordBot().getGuildId());
-                    for (ServiceLink link : status.getServiceLinks()) {
-                        if (link.getServiceId() == 2) {
-                            Member member = guild.getMemberById(link.getServiceUserId());
-                            if (member != null) {
-                                getDiscordBot().updateUserRoles(member, status);
+                    getDiscordBot().getDiscordAPI().getGuilds().forEach((guild) -> {
+                        for (ServiceLink link : status.getServiceLinks()) {
+                            if (link.getServiceId() == 2) {
+                                Member member = guild.getMemberById(link.getServiceUserId());
+                                if (member != null) {
+                                    getDiscordBot().updateUserRoles(member, status);
+                                }
                             }
                         }
-                    }
+                    });
                 } catch (ProcessingException ex) {
                     //Ignore, as it just means there was no update
                 } catch (GuildWars2VerificationAPIException ex) {

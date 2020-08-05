@@ -84,22 +84,15 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 
     private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(DiscordBot.class);
 
-    private static final String HOME_WORLD_ROLE_ID = "182812004631707648";
-    private static final String LINKED_WORLD_ROLE_ID = "182812235280678913";
-    private static final String TEMP_HOME_WORLD_ROLE_ID = "451360523066540032";
-    private static final String TEMP_LINKED_WORLD_ROLE_ID = "451360652875923457";
-    private static final String DJ_ROLE_ID = "482569992613920788";
-    private static final String COMMANDER_ROLE_ID = "182891788846104577";
+    private final Map<Long, ServerSettings> serverSettings = new HashMap();
 
 //    private static final String MUSIC_BOT_ROLE_NAME = "182813018919272448";
-    private static final String GUILD_ID = "174512426056810497";
     private static final String WELCOME_CHANNEL = "529635390164959232";
     private static final String SERVER_NAME = "Far Shiverpeaks";
     private static final String SERVICE_ID = "2";
 
-    private static final String TEMP_HOME_WORLD = "HOME_WORLD";
-    private static final String TEMP_LINKED_WORLD = "LINKED_WORLD";
-
+//    private static final String TEMP_HOME_WORLD = "HOME_WORLD";
+//    private static final String TEMP_LINKED_WORLD = "LINKED_WORLD";
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     private GuildWars2 gw2api;
@@ -107,11 +100,11 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     private String apiAuthToken;
     private ResourceBundle config;
 
-    private Role homeWorldRole = null;
-    private Role linkedWorldRole = null;
-    private Role tempHomeWorldRole = null;
-    private Role tempLinkedWorldRole = null;
-    private Role djRole = null;
+    private Map<Long, Role> homeWorldRole = new HashMap();
+    private Map<Long, Role> linkedWorldRole = new HashMap();
+    private Map<Long, Role> tempHomeWorldRole = new HashMap();
+    private Map<Long, Role> tempLinkedWorldRole = new HashMap();
+    private Map<Long, Role> djRole = new HashMap();
 //    private Role musicBotRole = null;
     private JDA discordAPI;
     private ScheduledFuture<?> refreshSchedule;
@@ -131,6 +124,24 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         this.config = config;
         this.apiAuthToken = config.getString("rest_access_token");
         gw2api = GuildWars2.getInstance();
+
+        // Far shiverpeaks discord
+        serverSettings.put(174512426056810497L, new ServerSettings(
+                "182812004631707648",
+                "182812235280678913",
+                "451360523066540032",
+                "451360652875923457",
+                "482569992613920788",
+                "182891788846104577"));
+
+        // FSP Fighters discord
+        serverSettings.put(174512426056810497L, new ServerSettings(
+                "722175144986017813",
+                "725633671486242827",
+                "722449716415037471",
+                "722449716415037471",
+                null,
+                "722127153038098502"));
     }
 
     public GuildWars2VerificationAPIClient getAPIClient() {
@@ -139,10 +150,6 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 
     public JDA getDiscordAPI() {
         return discordAPI;
-    }
-
-    public String getGuildId() {
-        return GUILD_ID;
     }
 
     public String getAPIAuthToken() {
@@ -204,18 +211,22 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     @Override
     public void onReady(ReadyEvent event) {
         LOGGER.info("API is ready!");
-        Guild guild = event.getJDA().getGuildById(GUILD_ID);
-
-        if (guild != null) {
+        for (Map.Entry<Long, ServerSettings> entry : serverSettings.entrySet()) {
+            Guild guild = event.getJDA().getGuildById(entry.getKey());
+            if (guild == null) {
+                LOGGER.warn("Not a member of guild with ID: " + entry.getKey());
+                continue;
+            }
             guild.getRoles().forEach((role) -> {
-                LOGGER.info("Role: " + role.getName() + " ID: " + role.getId());
+                LOGGER.info("Guild: " + guild.getName() + ":" + guild.getIdLong() + " Role: " + role.getName() + " ID: " + role.getId());
             });
 
-            homeWorldRole = guild.getRoleById(HOME_WORLD_ROLE_ID);
-            linkedWorldRole = guild.getRoleById(LINKED_WORLD_ROLE_ID);
-            tempHomeWorldRole = guild.getRoleById(TEMP_HOME_WORLD_ROLE_ID);
-            tempLinkedWorldRole = guild.getRoleById(TEMP_LINKED_WORLD_ROLE_ID);
-            djRole = guild.getRoleById(DJ_ROLE_ID);
+            ServerSettings settings = entry.getValue();
+            homeWorldRole.put(guild.getIdLong(), guild.getRoleById(settings.getHomeWorldRoleID()));
+            linkedWorldRole.put(guild.getIdLong(), guild.getRoleById(settings.getLinkedWorldRoleID()));
+            tempHomeWorldRole.put(guild.getIdLong(), guild.getRoleById(settings.getTempHomeWorldRoleID()));
+            tempLinkedWorldRole.put(guild.getIdLong(), guild.getRoleById(settings.getTempLinkedWorldRoleID()));
+            djRole.put(guild.getIdLong(), guild.getRoleById(settings.getDJRoleID()));
 //            musicBotRole = guild.getRoleById(MUSIC_BOT_ROLE_NAME);
         }
     }
@@ -585,12 +596,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     }
 
     public boolean isPleb(Member member) {
+        ServerSettings settings = serverSettings.get(member.getGuild().getIdLong());
         boolean isCommander = member.getRoles().stream().anyMatch((role) -> {
-            switch (role.getId()) {
-                case COMMANDER_ROLE_ID:
-                    return true;
-            }
-            return false;
+            return role.getId().equals(settings.getCommanderRoleID());
         });
 
         // Soo to avoid stuff... we just won't kick commanders
@@ -605,14 +613,10 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         }
 
         boolean isVerified = member.getRoles().stream().anyMatch((role) -> {
-            switch (role.getId()) {
-                case HOME_WORLD_ROLE_ID:
-                case LINKED_WORLD_ROLE_ID:
-                case TEMP_HOME_WORLD_ROLE_ID:
-                case TEMP_LINKED_WORLD_ROLE_ID:
-                    return true;
-            }
-            return false;
+            return role.getId().equals(settings.getHomeWorldRoleID())
+                    || role.getId().equals(settings.getLinkedWorldRoleID())
+                    || role.getId().equals(settings.getTempHomeWorldRoleID())
+                    || role.getId().equals(settings.getTempLinkedWorldRoleID());
         });
 
         return !isVerified;
@@ -656,77 +660,77 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             return;
         }
 
+        ServerSettings settings = serverSettings.get(member.getGuild().getIdLong());
+
         for (Role role : roles) {
-            switch (role.getId()) {
-                case TEMP_HOME_WORLD_ROLE_ID:
-                case TEMP_LINKED_WORLD_ROLE_ID:
-                    if (added) {
-                        VerificationStatus accessStatusData = getStatus(member.getUser().getId(), member.getEffectiveName());
+            if (role.getId().equals(settings.getTempHomeWorldRoleID())
+                    || role.getId().equals(settings.getTempLinkedWorldRoleID())) {
+                if (added) {
+                    VerificationStatus accessStatusData = getStatus(member.getUser().getId(), member.getEffectiveName());
 
-                        boolean givenTempAccess = grantTemporaryAccess(member.getUser(), accessStatusData);
-                        //Refresh data from website
-                        //TODO Consider not doing this, as the website actually informs the teamspeak
-                        //bot if a user has recieved temporary access, which causes the bot to
-                        //refresh the user data twice
-                        if (givenTempAccess) {
-                            accessStatusData = getStatus(member.getUser().getId(), member.getEffectiveName());
-                        }
-                        updateUserRoles(member, accessStatusData);
+                    boolean givenTempAccess = grantTemporaryAccess(member.getUser(), accessStatusData);
+                    //Refresh data from website
+                    //TODO Consider not doing this, as the website actually informs the teamspeak
+                    //bot if a user has recieved temporary access, which causes the bot to
+                    //refresh the user data twice
+                    if (givenTempAccess) {
+                        accessStatusData = getStatus(member.getUser().getId(), member.getEffectiveName());
                     }
-                    break;
-                default:
-                    boolean isPrimaryGuild = role.getName().matches("\\[.*?\\].*");
-                    boolean isSecondaryGuild = role.getName().matches("\\{.*?\\}.*");
-                    if (isPrimaryGuild || isSecondaryGuild) {
-                        if (added) {
-                            String guildName = role.getName().replaceFirst("(\\[|\\{).*?(\\]|\\}) ", "");
-                            try {
-                                String guildId = getGuildIdFromName(guildName);
-                                VerificationStatus status = getStatus(member.getUser().getId(), member.getEffectiveName());
-                                Map<String, Object> accountData = (Map<String, Object>) status.getAdditionalProperties().get("AccountData");
-                                if (accountData != null) {
-                                    List<String> guilds = (List<String>) accountData.get("guilds");
-                                    if (!guilds.contains(guildId)) {
-                                        member.getGuild().removeRoleFromMember(member, role).queue();
-                                    } else {
-                                        if (isPrimaryGuild) {
-                                            // Rename user
-                                            Pattern p = Pattern.compile("\\[.*\\]");
-                                            Matcher roleTagMatch = p.matcher(role.getName());
-                                            if (!roleTagMatch.find()) {
-                                                throw new RuntimeException();
-                                            }
-                                            String roleTag = roleTagMatch.group();
-                                            Matcher match = p.matcher(member.getEffectiveName());
-                                            if (match.find()) {
-                                                // Replace existing tag
-                                                member.modifyNickname(match.replaceAll(roleTag)).queue();
-                                            } else {
-                                                member.modifyNickname(roleTag + " " + member.getEffectiveName()).queue();
-                                            }
-
-                                            // remove other primary roles
-                                            List<Role> rolesToRemove = new ArrayList();
-                                            member.getRoles().forEach((r) -> {
-                                                if (!r.getId().equals(role.getId()) && r.getName().matches("\\[.*?\\].*")) {
-                                                    rolesToRemove.add(r);
-                                                }
-                                            });
-                                            rolesToRemove.forEach(roleToRemove -> {
-                                                member.getGuild().removeRoleFromMember(member, roleToRemove).queue();
-                                            });
+                    updateUserRoles(member, accessStatusData);
+                }
+            } else {
+                boolean isPrimaryGuild = role.getName().matches("\\[.*?\\].*");
+                boolean isSecondaryGuild = role.getName().matches("\\{.*?\\}.*");
+                if (isPrimaryGuild || isSecondaryGuild) {
+                    if (added) {
+                        String guildName = role.getName().replaceFirst("(\\[|\\{).*?(\\]|\\}) ", "");
+                        try {
+                            String guildId = getGuildIdFromName(guildName);
+                            VerificationStatus status = getStatus(member.getUser().getId(), member.getEffectiveName());
+                            Map<String, Object> accountData = (Map<String, Object>) status.getAdditionalProperties().get("AccountData");
+                            if (accountData != null) {
+                                List<String> guilds = (List<String>) accountData.get("guilds");
+                                if (!guilds.contains(guildId)) {
+                                    member.getGuild().removeRoleFromMember(member, role).queue();
+                                } else {
+                                    if (isPrimaryGuild) {
+                                        // Rename user
+                                        Pattern p = Pattern.compile("\\[.*\\]");
+                                        Matcher roleTagMatch = p.matcher(role.getName());
+                                        if (!roleTagMatch.find()) {
+                                            throw new RuntimeException();
                                         }
+                                        String roleTag = roleTagMatch.group();
+                                        Matcher match = p.matcher(member.getEffectiveName());
+                                        if (match.find()) {
+                                            // Replace existing tag
+                                            member.modifyNickname(match.replaceAll(roleTag)).queue();
+                                        } else {
+                                            member.modifyNickname(roleTag + " " + member.getEffectiveName()).queue();
+                                        }
+
+                                        // remove other primary roles
+                                        List<Role> rolesToRemove = new ArrayList();
+                                        member.getRoles().forEach((r) -> {
+                                            if (!r.getId().equals(role.getId()) && r.getName().matches("\\[.*?\\].*")) {
+                                                rolesToRemove.add(r);
+                                            }
+                                        });
+                                        rolesToRemove.forEach(roleToRemove -> {
+                                            member.getGuild().removeRoleFromMember(member, roleToRemove).queue();
+                                        });
                                     }
                                 }
-                            } catch (IOException ex) {
-                                LOGGER.error(ex.getMessage(), ex);
                             }
-                        } else {
-                            String nickname = member.getEffectiveName().replaceFirst("\\[.*?\\] ", "");
-                            member.modifyNickname(nickname).queue();
+                        } catch (IOException ex) {
+                            LOGGER.error(ex.getMessage(), ex);
                         }
+                    } else {
+                        String nickname = member.getEffectiveName().replaceFirst("\\[.*?\\] ", "");
+                        member.modifyNickname(nickname).queue();
                     }
-                    break;
+                }
+                break;
             }
         }
     }
@@ -762,17 +766,27 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     public void updateUserRoles(Member member, VerificationStatus accessStatus) {
         List<Role> rolesForUser = member.getRoles();
         userRefreshingRoles.add(member.getUser().getIdLong());
+        Long serverId = member.getGuild().getIdLong();
         try {
             switch (AccessStatus.valueOf(accessStatus.getStatus())) {
                 case ACCESS_GRANTED_HOME_WORLD:
                     if (accessStatus.getIsPrimary() == null || accessStatus.getIsPrimary()) {
                         //Access is primary and not a music bot
-                        addRoleToUserIfNotOwned(member, rolesForUser, homeWorldRole, djRole);
-                        removeRoleFromUserIfOwned(member, rolesForUser, linkedWorldRole, tempHomeWorldRole, tempLinkedWorldRole/*, musicBotRole*/);
+                        addRoleToUserIfNotOwned(member, rolesForUser,
+                                homeWorldRole.get(serverId),
+                                djRole.get(serverId));
+                        removeRoleFromUserIfOwned(member, rolesForUser,
+                                linkedWorldRole.get(serverId),
+                                tempHomeWorldRole.get(serverId),
+                                tempLinkedWorldRole.get(serverId)/*, musicBotRole*/);
                     } else {
                         //Access is granted trough another user and is a music bot
                         addRoleToUserIfNotOwned(member, rolesForUser/*, musicBotRole*/);
-                        removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempHomeWorldRole, tempLinkedWorldRole);
+                        removeRoleFromUserIfOwned(member, rolesForUser,
+                                homeWorldRole.get(serverId),
+                                linkedWorldRole.get(serverId),
+                                tempHomeWorldRole.get(serverId),
+                                tempLinkedWorldRole.get(serverId));
                     }
                     break;
                 case ACCESS_GRANTED_HOME_WORLD_TEMPORARY:
@@ -790,12 +804,21 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 case ACCESS_GRANTED_LINKED_WORLD:
                     if (accessStatus.getIsPrimary() == null || accessStatus.getIsPrimary()) {
                         //Access is primary and not a music bot
-                        addRoleToUserIfNotOwned(member, rolesForUser, linkedWorldRole, djRole);
-                        removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, tempHomeWorldRole, tempLinkedWorldRole/*, musicBotRole*/);
+                        addRoleToUserIfNotOwned(member, rolesForUser,
+                                linkedWorldRole.get(serverId),
+                                djRole.get(serverId));
+                        removeRoleFromUserIfOwned(member, rolesForUser,
+                                homeWorldRole.get(serverId),
+                                tempHomeWorldRole.get(serverId),
+                                tempLinkedWorldRole.get(serverId)/*, musicBotRole*/);
                     } else {
                         //Access is granted trough another user and is a music bot
                         addRoleToUserIfNotOwned(member, rolesForUser/*, musicBotRole*/);
-                        removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempHomeWorldRole, tempLinkedWorldRole);
+                        removeRoleFromUserIfOwned(member, rolesForUser,
+                                homeWorldRole.get(serverId),
+                                linkedWorldRole.get(serverId),
+                                tempHomeWorldRole.get(serverId),
+                                tempLinkedWorldRole.get(serverId));
                     }
                     break;
                 case ACCESS_GRANTED_LIMKED_WORLD_TEMPORARY:
@@ -817,7 +840,12 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 case ACCESS_DENIED_INVALID_WORLD:
                     //Role[] rolesForUserArray = new Role[rolesForUser.size()];
                     //removeRoleFromUserIfOwned(member, rolesForUser, (Role[]) rolesForUser.toArray(rolesForUserArray));
-                    removeRoleFromUserIfOwned(member, rolesForUser, homeWorldRole, linkedWorldRole, tempHomeWorldRole, tempLinkedWorldRole, djRole/*, musicBotRole*/);
+                    removeRoleFromUserIfOwned(member, rolesForUser,
+                            homeWorldRole.get(serverId),
+                            linkedWorldRole.get(serverId),
+                            tempHomeWorldRole.get(serverId),
+                            tempLinkedWorldRole.get(serverId),
+                            djRole.get(serverId)/*, musicBotRole*/);
                     break;
                 case COULD_NOT_CONNECT:
                     break;
@@ -920,22 +948,22 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         }
 
         for (Guild guild : user.getMutualGuilds()) {
+            ServerSettings settings = serverSettings.get(guild.getIdLong());
+            // Member is never null, as it only checks for mutual servers
             for (Role role : guild.getMember(user).getRoles()) {
-                switch (role.getId()) {
-                    case TEMP_HOME_WORLD_ROLE_ID:
-                        //if(!shadowMode){
-                        grantTemporary(user.getId(), user.getName(), AccessType.HOME_WORLD.name());
-                        //}
-                        accessGiven = true;
-                        LOGGER.info("User " + user.getId() + " has been granted temporary access [Home World]");
-                        break;
-                    case TEMP_LINKED_WORLD_ROLE_ID:
+                if (role.getId().equals(settings.getTempHomeWorldRoleID())) {
+                    //if(!shadowMode){
+                    grantTemporary(user.getId(), user.getName(), AccessType.HOME_WORLD.name());
+                    //}
+                    accessGiven = true;
+                    LOGGER.info("User " + user.getId() + " has been granted temporary access [Home World]");
+                    if (role.getId().equals(settings.getTempLinkedWorldRoleID())) {
                         //if(!shadowMode){
                         grantTemporary(user.getId(), user.getName(), AccessType.LINKED_WORLD.name());
                         //}
                         accessGiven = true;
                         LOGGER.info("User " + user.getId() + " has been granted temporary access [Linked World]");
-                        break;
+                    }
                 }
             }
         }
