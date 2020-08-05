@@ -135,7 +135,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 "182891788846104577"));
 
         // FSP Fighters discord
-        serverSettings.put(174512426056810497L, new ServerSettings(
+        serverSettings.put(722126272335052810L, new ServerSettings(
                 "722175144986017813",
                 "725633671486242827",
                 "722449716415037471",
@@ -226,7 +226,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             linkedWorldRole.put(guild.getIdLong(), guild.getRoleById(settings.getLinkedWorldRoleID()));
             tempHomeWorldRole.put(guild.getIdLong(), guild.getRoleById(settings.getTempHomeWorldRoleID()));
             tempLinkedWorldRole.put(guild.getIdLong(), guild.getRoleById(settings.getTempLinkedWorldRoleID()));
-            djRole.put(guild.getIdLong(), guild.getRoleById(settings.getDJRoleID()));
+            if (settings.getDJRoleID() != null) {
+                djRole.put(guild.getIdLong(), guild.getRoleById(settings.getDJRoleID()));
+            }
 //            musicBotRole = guild.getRoleById(MUSIC_BOT_ROLE_NAME);
         }
     }
@@ -882,7 +884,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         boolean result = false;
         List<Role> rolesToRemove = new ArrayList();
         for (Role role : roles) {
-            if (givenRoles.contains(role)) {
+            if (role != null && givenRoles.contains(role)) {
                 rolesToRemove.add(role);
                 LOGGER.info("Removing " + member.getEffectiveName() + " from " + role.getName());
             }
@@ -911,7 +913,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         boolean result = false;
         List<Role> rolesToAssign = new ArrayList();
         for (Role role : roles) {
-            if (!givenRoles.contains(role)) {
+            if (role != null && !givenRoles.contains(role)) {
                 rolesToAssign.add(role);
             }
         }
