@@ -915,6 +915,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         for (Role role : roles) {
             if (role != null && !givenRoles.contains(role)) {
                 rolesToAssign.add(role);
+                LOGGER.info("Adding " + member.getEffectiveName() + " to " + role.getName());
             }
         }
         if (rolesToAssign.size() > 0) {
