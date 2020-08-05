@@ -314,7 +314,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 }
                 break;
             case ACCESS_GRANTED_HOME_WORLD_TEMPORARY:
-            case ACCESS_GRANTED_LIMKED_WORLD_TEMPORARY:
+            case ACCESS_GRANTED_LINKED_WORLD_TEMPORARY:
                 if (!hideIfVerified) {
                     sendCurrentAccessTypeMessage(user, accessStatusData);
                     sendVerifyMessage(user, getAPIKeyName(user.getId()));
@@ -823,7 +823,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                                 tempLinkedWorldRole.get(serverId));
                     }
                     break;
-                case ACCESS_GRANTED_LIMKED_WORLD_TEMPORARY:
+                case ACCESS_GRANTED_LINKED_WORLD_TEMPORARY:
                     //Don't assign temporary groups, just let mods/commanders deal with them
 //                    if (!accessStatus.isMusicBot()) {
 //                        //Access is primary and not a music bot
