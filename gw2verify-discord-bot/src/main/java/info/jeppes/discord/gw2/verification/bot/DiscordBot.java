@@ -127,6 +127,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 
         // Far shiverpeaks discord
         serverSettings.put(174512426056810497L, new ServerSettings(
+                false,
                 "182812004631707648",
                 "182812235280678913",
                 "451360523066540032",
@@ -136,6 +137,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 
         // FSP Fighters discord
         serverSettings.put(722126272335052810L, new ServerSettings(
+                true,
                 "722175144986017813",
                 "725633671486242827",
                 "722449716415037471",
@@ -856,6 +858,16 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         } finally {
             userRefreshingRoles.remove(member.getUser().getIdLong());
         }
+
+        //Add account name as display name
+        if (serverSettings.get(serverId).isAddAccountName() && member.getNickname() == null) {
+            Map<String, Object> accountData = (Map<String, Object>) accessStatus.getAdditionalProperties().get("AccountData");
+            if (accountData != null) {
+                String accountName = (String) accountData.get("name");
+                member.modifyNickname(member.getUser().getName() + " - " + accountName).queue();;
+            }
+        }
+
         rolesForUser.forEach(role -> {
             String guildName = getGuildNameFromRole(role.getName());
             if (guildName != null) {
