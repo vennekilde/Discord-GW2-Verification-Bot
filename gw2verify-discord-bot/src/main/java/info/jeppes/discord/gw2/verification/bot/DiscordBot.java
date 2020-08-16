@@ -864,7 +864,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             Map<String, Object> accountData = (Map<String, Object>) accessStatus.getAdditionalProperties().get("AccountData");
             if (accountData != null) {
                 String accountName = (String) accountData.get("name");
-                member.modifyNickname(member.getUser().getName() + " - " + accountName).queue();;
+                if (accountName != null && accountName != "") {
+                    member.modifyNickname(member.getUser().getName() + " - " + accountName).queue();
+                };
             }
         }
 
