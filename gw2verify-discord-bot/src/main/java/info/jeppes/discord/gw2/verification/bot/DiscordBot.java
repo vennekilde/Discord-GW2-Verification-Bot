@@ -884,7 +884,15 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             if (accountData != null) {
                 String accountName = (String) accountData.get("name");
                 if (accountName != null && accountName != "") {
-                    member.modifyNickname(member.getUser().getName() + " - " + accountName).queue();
+                    String newName = member.getUser().getName() + " - " + accountName;
+                    int lenght = newName.length();
+                    if (lenght > 32) {
+                        LOGGER.info("Name " + newName + " is too long");
+                        int nameLength = member.getUser().getName().length();
+                        newName = member.getUser().getName().substring(0, nameLength - (lenght - 32) - 1) + " - " + accountName;
+                        LOGGER.info("Shorted to " + newName);
+                    }
+                    member.modifyNickname(newName).queue();
                 };
             }
         }
