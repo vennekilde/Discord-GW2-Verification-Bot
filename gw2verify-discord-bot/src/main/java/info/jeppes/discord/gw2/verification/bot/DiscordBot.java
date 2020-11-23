@@ -426,10 +426,24 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             LOGGER.info(event.getChannel().getName() + " - " + event.getAuthor().getId() + ":" + name + ": " + rawContent);
             String[] content = rawContent.split(" ");
             switch (content[0].toLowerCase()) {
+                case "!glistm":
+                    if (event.getAuthor().getId() == "187402729696526336") {
+                        StringBuilder sb = new StringBuilder();
+                        Role role = getDiscordAPI().getRoleById(content[1]);
+                        if (role == null) {
+                            sendPrivateMessage(event.getAuthor(), "You need to use this command on the Discord server");
+                            break;
+                        }
+                    }
+                    break;
                 case "!add":
                     event.getMessage().delete().queue();
                     if (event.getMember() == null) {
                         event.getChannel().sendMessage("You need to use this command on the Discord server").queue();
+                        break;
+                    }
+                    if (content.length < 2) {
+                        sendPrivateMessage(event.getAuthor(), "Missing guild tag. Command syntax: !add <GuildTag>");
                         break;
                     }
                     addGuildRole(event.getMessage().getMember(), content[1], true);
@@ -440,12 +454,20 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                         event.getChannel().sendMessage("You need to use this command on the Discord server").queue();
                         break;
                     }
+                    if (content.length < 2) {
+                        sendPrivateMessage(event.getAuthor(), "Missing guild tag. Command syntax: !addsec <GuildTag>");
+                        break;
+                    }
                     addGuildRole(event.getMessage().getMember(), content[1], false);
                     break;
                 case "!rm":
                     event.getMessage().delete().queue();
                     if (event.getMember() == null) {
                         event.getChannel().sendMessage("You need to use this command on the Discord server").queue();
+                        break;
+                    }
+                    if (content.length < 2) {
+                        sendPrivateMessage(event.getAuthor(), "Missing guild tag. Command syntax: !rm <GuildTag>");
                         break;
                     }
                     removeGuildRole(event.getMessage().getMember(), content[1]);
