@@ -1168,8 +1168,10 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 member.getGuild().removeRoleFromMember(member, role).queue();
             });
 
-            String nickname = member.getEffectiveName().replaceFirst("^\\[.*?\\] ", "");
-            member.modifyNickname(nickname).queue();
+            if (tagMatcher.matcher(member.getEffectiveName()).find()) {
+                String nickname = member.getEffectiveName().replaceFirst("^\\[.*?\\] ", "");
+                member.modifyNickname(nickname).queue();
+            }
 
             member.getUser().openPrivateChannel().queue((channel) -> {
                 channel.sendMessage("You have been removed from  \"" + guildRoles.get(0).getName() + "\"").queue();
@@ -1184,8 +1186,13 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     private void removeGuildRole(Member member, Role role) {
         member.getGuild().removeRoleFromMember(member, role).queue();
 
-        String nickname = member.getEffectiveName().replaceFirst("^\\[.*?\\] ", "");
-        member.modifyNickname(nickname).queue();
+        Pattern p = Pattern.compile("\\[.*\\]");
+        Matcher roleTagMatch = p.matcher(role.getName());
+        if (roleTagMatch.find()) {
+            String roleTag = roleTagMatch.group();
+            String nickname = member.getEffectiveName().replaceFirst("^\\[" + roleTag + "\\] ", "");
+            member.modifyNickname(nickname).queue();
+        }
     }
 
     public String getGuildNameFromRole(String role) {
