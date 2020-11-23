@@ -9,6 +9,7 @@ import com.farshiverpeaks.gw2verifyclient.api.GuildWars2VerificationAPIClient;
 import com.farshiverpeaks.gw2verifyclient.exceptions.GuildWars2VerificationAPIException;
 import com.farshiverpeaks.gw2verifyclient.model.APIKeyData;
 import com.farshiverpeaks.gw2verifyclient.model.APIKeyName;
+import com.farshiverpeaks.gw2verifyclient.model.Error;
 import com.farshiverpeaks.gw2verifyclient.model.TemporaryData;
 import com.farshiverpeaks.gw2verifyclient.model.VerificationStatus;
 import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.apikey.model.ApikeyPUTHeader;
@@ -258,8 +259,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             sendVerifyMessageCheckAccess(event.getUser());
         } catch (GuildWars2VerificationAPIException ex) {
             LOGGER.error(ex.getMessage(), ex);
-            if (ex.getError() != null && ex.getError().getSafeDisplayError() != null) {
-                sendPrivateMessage(event.getUser(), ex.getError().getSafeDisplayError());
+            Error error = getErrorFromGW2VerificationAPIException(ex);
+            if (error != null && error.getSafeDisplayError() != null) {
+                sendPrivateMessage(event.getUser(), error.getSafeDisplayError());
             }
         }
         sendWelcomeMessage(event.getUser());
@@ -501,15 +503,10 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     break;
             }
         } catch (GuildWars2VerificationAPIException ex) {
-            if (ex.getError() != null) {
-                LOGGER.error(ex.getError().getError());
-                if (ex.getError().getSafeDisplayError() != null) {
-                    sendPrivateMessage(event.getAuthor(), ex.getError().getSafeDisplayError());
-                } else {
-                    sendPrivateMessage(event.getAuthor(), "Unable to communicate with verification backend");
-                }
+            Error error = getErrorFromGW2VerificationAPIException(ex);
+            if (error != null && error.getSafeDisplayError() != null) {
+                sendPrivateMessage(event.getAuthor(), error.getSafeDisplayError());
             } else {
-                LOGGER.error(ex.getMessage(), ex);
                 sendPrivateMessage(event.getAuthor(), "Unable to communicate with verification backend");
             }
         } catch (Throwable ex) {
@@ -993,7 +990,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         StatusGETHeader headers = new StatusGETHeader(getAPIAuthToken());
         VerificationStatus accessStatusData = getAPIClient().users
                 .serviceId(SERVICE_ID)
-                .serviceUserId(userId).verification.status.get(qParams, headers);
+                .serviceUserId(userId).verification.status.get(qParams, headers).getBody();
         return accessStatusData;
     }
 
@@ -1003,23 +1000,23 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         TemporaryPUTHeader headers = new TemporaryPUTHeader(getAPIAuthToken());
         long expiresIn = getAPIClient().users
                 .serviceId(SERVICE_ID)
-                .serviceUserId(userId).verification.temporary.put(body, headers);
+                .serviceUserId(userId).verification.temporary.put(body, headers).getBody();
         return expiresIn;
     }
 
     public void setUserProperty(String userId, String name, String value) throws GuildWars2VerificationAPIException {
         PropertiesPUTQueryParam qParams = new PropertiesPUTQueryParam(name, value);
         PropertiesPUTHeader headers = new PropertiesPUTHeader(getAPIAuthToken());
-        String response = getAPIClient().users
+        getAPIClient().users
                 .serviceId(SERVICE_ID)
-                .serviceUserId(userId).properties.put(qParams, headers);
+                .serviceUserId(userId).properties.put(qParams, headers).getBody();
     }
 
     public VerificationStatus refreshAccess(String userId) throws GuildWars2VerificationAPIException {
         RefreshPOSTHeader headers = new RefreshPOSTHeader(getAPIAuthToken());
         VerificationStatus response = getAPIClient().users
                 .serviceId(SERVICE_ID)
-                .serviceUserId(userId).verification.refresh.post(headers);
+                .serviceUserId(userId).verification.refresh.post(headers).getBody();
         return response;
     }
 
@@ -1027,7 +1024,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         APIKeyData body = new APIKeyData(apikey, primary);
         ApikeyPUTHeader headers = new ApikeyPUTHeader(getAPIAuthToken());
         ApikeyPUTQueryParam qParams = new ApikeyPUTQueryParam(false);
-        String response = getAPIClient().users
+        getAPIClient().users
                 .serviceId(SERVICE_ID)
                 .serviceUserId(userId).apikey.put(body, qParams, headers);
     }
@@ -1036,7 +1033,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         NameGETHeader headers = new NameGETHeader(getAPIAuthToken());
         APIKeyName response = getAPIClient().users
                 .serviceId(SERVICE_ID)
-                .serviceUserId(userId).apikey.name.get(headers);
+                .serviceUserId(userId).apikey.name.get(headers).getBody();
         return response.getName();
     }
 
@@ -1194,5 +1191,12 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             }
         }
         return id;
+    }
+
+    public Error getErrorFromGW2VerificationAPIException(GuildWars2VerificationAPIException ex) {
+        if (ex.getResponse().hasEntity()) {
+            return ex.getResponse().readEntity(Error.class);
+        }
+        return null;
     }
 }
