@@ -18,8 +18,9 @@ public class ServerSettings {
     private final String TempLinkedWorldRoleID;
     private final String DJRoleID;
     private final String CommanderRoleID;
+    private final String[] RolesToRemoveWhenInvalid;
 
-    public ServerSettings(boolean addAccountName, String HomeWorldRoleID, String LinkedWorldRoleID, String TempHomeWorldRoleID, String TempLinkedWorldRoleID, String DJRoleID, String CommanderRoleID) {
+    public ServerSettings(boolean addAccountName, String HomeWorldRoleID, String LinkedWorldRoleID, String TempHomeWorldRoleID, String TempLinkedWorldRoleID, String DJRoleID, String CommanderRoleID, String[] RolesToRemoveWhenInvalid) {
         this.addAccountName = addAccountName;
         this.HomeWorldRoleID = HomeWorldRoleID;
         this.LinkedWorldRoleID = LinkedWorldRoleID;
@@ -27,6 +28,7 @@ public class ServerSettings {
         this.TempLinkedWorldRoleID = TempLinkedWorldRoleID;
         this.DJRoleID = DJRoleID;
         this.CommanderRoleID = CommanderRoleID;
+        this.RolesToRemoveWhenInvalid = RolesToRemoveWhenInvalid;
     }
 
     public boolean isAddAccountName() {
@@ -55,5 +57,9 @@ public class ServerSettings {
 
     public String getCommanderRoleID() {
         return CommanderRoleID;
+    }
+
+    public String[] getRolesToRemoveWhenInvalid() {
+        return RolesToRemoveWhenInvalid;
     }
 }

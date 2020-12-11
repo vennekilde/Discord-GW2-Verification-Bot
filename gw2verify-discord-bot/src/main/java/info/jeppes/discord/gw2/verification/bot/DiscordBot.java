@@ -28,6 +28,7 @@ import java.net.URL;
 import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -106,6 +107,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     private Map<Long, Role> tempHomeWorldRole = new HashMap();
     private Map<Long, Role> tempLinkedWorldRole = new HashMap();
     private Map<Long, Role> djRole = new HashMap();
+    private Map<Long, List<Role>> additionalRoles = new HashMap();
 //    private Role musicBotRole = null;
     private JDA discordAPI;
     private ScheduledFuture<?> refreshSchedule;
@@ -134,7 +136,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 "451360523066540032",
                 "451360652875923457",
                 "482569992613920788",
-                "182891788846104577"));
+                "182891788846104577",
+                new String[]{"530768604497575950"}
+        ));
 
         // FSP Fighters discord
         serverSettings.put(722126272335052810L, new ServerSettings(
@@ -144,7 +148,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 "722449716415037471",
                 "722449716415037471",
                 null,
-                "722127153038098502"));
+                "722127153038098502",
+                null
+        ));
     }
 
     public GuildWars2VerificationAPIClient getAPIClient() {
@@ -231,6 +237,14 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             tempLinkedWorldRole.put(guild.getIdLong(), guild.getRoleById(settings.getTempLinkedWorldRoleID()));
             if (settings.getDJRoleID() != null) {
                 djRole.put(guild.getIdLong(), guild.getRoleById(settings.getDJRoleID()));
+            }
+            if (settings.getRolesToRemoveWhenInvalid() != null) {
+                if (settings.getRolesToRemoveWhenInvalid().length > 0) {
+                    additionalRoles.put(guild.getIdLong(), new ArrayList());
+                }
+                Arrays.stream(settings.getRolesToRemoveWhenInvalid()).forEach((roleID) -> {
+                    additionalRoles.get(guild.getIdLong()).add(guild.getRoleById(roleID));
+                });
             }
 //            musicBotRole = guild.getRoleById(MUSIC_BOT_ROLE_NAME);
         }
@@ -862,15 +876,22 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 case ACCESS_DENIED_BANNED:
                 case ACCESS_DENIED_EXPIRED:
                 case ACCESS_DENIED_INVALID_WORLD:
-                    //Role[] rolesForUserArray = new Role[rolesForUser.size()];
-                    //removeRoleFromUserIfOwned(member, rolesForUser, (Role[]) rolesForUser.toArray(rolesForUserArray));
+                    // Do not uncomment this unless you have fixed the issue!!!!
+                    // YOU ALREADY DID THIS ONCE!!!!
+//                    Role[] rolesForUserArray = new Role[rolesForUser.size()];
+//                    removeRoleFromUserIfOwned(member, rolesForUser, (Role[]) rolesForUser.toArray(rolesForUserArray));
                     removeRoleFromUserIfOwned(member, rolesForUser,
                             homeWorldRole.get(serverId),
                             linkedWorldRole.get(serverId),
                             tempHomeWorldRole.get(serverId),
                             tempLinkedWorldRole.get(serverId),
                             djRole.get(serverId)/*, musicBotRole*/);
+                    List<Role> additionalRolesList = additionalRoles.get(this);
+                    if (additionalRolesList != null) {
+                        removeRoleFromUserIfOwned(member, rolesForUser, additionalRolesList.toArray(new Role[additionalRolesList.size()]));
+                    }
                     break;
+
                 case COULD_NOT_CONNECT:
                     break;
             }
