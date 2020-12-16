@@ -806,25 +806,32 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         userRefreshingRoles.add(member.getUser().getIdLong());
         Long serverId = member.getGuild().getIdLong();
         try {
-            switch (AccessStatus.valueOf(accessStatus.getStatus())) {
+            AccessStatus verificationStatus = AccessStatus.valueOf(accessStatus.getStatus());
+            switch (verificationStatus) {
                 case ACCESS_GRANTED_HOME_WORLD:
                     if (accessStatus.getIsPrimary() == null || accessStatus.getIsPrimary()) {
                         //Access is primary and not a music bot
                         addRoleToUserIfNotOwned(member, rolesForUser,
                                 homeWorldRole.get(serverId),
                                 djRole.get(serverId));
-                        removeRoleFromUserIfOwned(member, rolesForUser,
+                        boolean removedAny = removeRoleFromUserIfOwned(member, rolesForUser,
                                 linkedWorldRole.get(serverId),
                                 tempHomeWorldRole.get(serverId),
                                 tempLinkedWorldRole.get(serverId)/*, musicBotRole*/);
+                        if (removedAny) {
+                            LOGGER.info("Removed roles from " + member.getEffectiveName() + " due to " + verificationStatus);
+                        }
                     } else {
                         //Access is granted trough another user and is a music bot
                         addRoleToUserIfNotOwned(member, rolesForUser/*, musicBotRole*/);
-                        removeRoleFromUserIfOwned(member, rolesForUser,
+                        boolean removedAny = removeRoleFromUserIfOwned(member, rolesForUser,
                                 homeWorldRole.get(serverId),
                                 linkedWorldRole.get(serverId),
                                 tempHomeWorldRole.get(serverId),
                                 tempLinkedWorldRole.get(serverId));
+                        if (removedAny) {
+                            LOGGER.info("Removed roles from " + member.getEffectiveName() + " due to " + verificationStatus);
+                        }
                     }
                     break;
                 case ACCESS_GRANTED_HOME_WORLD_TEMPORARY:
@@ -845,18 +852,24 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                         addRoleToUserIfNotOwned(member, rolesForUser,
                                 linkedWorldRole.get(serverId),
                                 djRole.get(serverId));
-                        removeRoleFromUserIfOwned(member, rolesForUser,
+                        boolean removedAny = removeRoleFromUserIfOwned(member, rolesForUser,
                                 homeWorldRole.get(serverId),
                                 tempHomeWorldRole.get(serverId),
                                 tempLinkedWorldRole.get(serverId)/*, musicBotRole*/);
+                        if (removedAny) {
+                            LOGGER.info("Removed roles from " + member.getEffectiveName() + " due to " + verificationStatus);
+                        }
                     } else {
                         //Access is granted trough another user and is a music bot
                         addRoleToUserIfNotOwned(member, rolesForUser/*, musicBotRole*/);
-                        removeRoleFromUserIfOwned(member, rolesForUser,
+                        boolean removedAny = removeRoleFromUserIfOwned(member, rolesForUser,
                                 homeWorldRole.get(serverId),
                                 linkedWorldRole.get(serverId),
                                 tempHomeWorldRole.get(serverId),
                                 tempLinkedWorldRole.get(serverId));
+                        if (removedAny) {
+                            LOGGER.info("Removed roles from " + member.getEffectiveName() + " due to " + verificationStatus);
+                        }
                     }
                     break;
                 case ACCESS_GRANTED_LINKED_WORLD_TEMPORARY:
@@ -880,15 +893,21 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     // YOU ALREADY DID THIS ONCE!!!!
 //                    Role[] rolesForUserArray = new Role[rolesForUser.size()];
 //                    removeRoleFromUserIfOwned(member, rolesForUser, (Role[]) rolesForUser.toArray(rolesForUserArray));
-                    removeRoleFromUserIfOwned(member, rolesForUser,
+                    boolean removedAny = removeRoleFromUserIfOwned(member, rolesForUser,
                             homeWorldRole.get(serverId),
                             linkedWorldRole.get(serverId),
                             tempHomeWorldRole.get(serverId),
                             tempLinkedWorldRole.get(serverId),
                             djRole.get(serverId)/*, musicBotRole*/);
                     List<Role> additionalRolesList = additionalRoles.get(this);
+                    if (removedAny) {
+                        LOGGER.info("Removed roles from " + member.getEffectiveName() + " due to " + verificationStatus);
+                    }
                     if (additionalRolesList != null) {
-                        removeRoleFromUserIfOwned(member, rolesForUser, additionalRolesList.toArray(new Role[additionalRolesList.size()]));
+                        removedAny = removeRoleFromUserIfOwned(member, rolesForUser, additionalRolesList.toArray(new Role[additionalRolesList.size()]));
+                        if (removedAny) {
+                            LOGGER.info("Removed additional roles from " + member.getEffectiveName() + " due to " + verificationStatus);
+                        }
                     }
                     break;
 
@@ -929,11 +948,11 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                             List<String> guilds = (List<String>) accountData.get("guilds");
                             if (!guilds.contains(guildId)) {
                                 removeGuildRole(member, role);
-                                LOGGER.info("Removing " + member.getEffectiveName() + " from " + role.getName());
+                                LOGGER.info("Removing " + member.getEffectiveName() + " from guild role: " + role.getName());
                             }
                         } else {
                             removeGuildRole(member, role);
-                            LOGGER.info("Removing " + member.getEffectiveName() + " from " + role.getName());
+                            LOGGER.info("Removing " + member.getEffectiveName() + " from guild role: " + role.getName());
                         }
                     }
                 } catch (IOException ex) {
