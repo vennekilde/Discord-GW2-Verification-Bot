@@ -451,7 +451,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     }
                     break;
                 case "!add":
+                try {
                     event.getMessage().delete().queue();
+                } finally {
                     if (event.getMember() == null) {
                         event.getChannel().sendMessage("You need to use this command on the Discord server").queue();
                         break;
@@ -462,8 +464,11 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     }
                     addGuildRole(event.getMessage().getMember(), content[1], true);
                     break;
+                }
                 case "!addsec":
+                try {
                     event.getMessage().delete().queue();
+                } finally {
                     if (event.getMember() == null) {
                         event.getChannel().sendMessage("You need to use this command on the Discord server").queue();
                         break;
@@ -474,8 +479,11 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     }
                     addGuildRole(event.getMessage().getMember(), content[1], false);
                     break;
+                }
                 case "!rm":
+                try {
                     event.getMessage().delete().queue();
+                } finally {
                     if (event.getMember() == null) {
                         event.getChannel().sendMessage("You need to use this command on the Discord server").queue();
                         break;
@@ -486,6 +494,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     }
                     removeGuildRole(event.getMessage().getMember(), content[1]);
                     break;
+                }
                 case "/verify":
                 case "!verify":
                 case "/apikey":
@@ -1142,6 +1151,9 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     List<String> guilds = (List<String>) accountData.get("guilds");
                     if (!guilds.contains(guildId)) {
                         member.getGuild().removeRoleFromMember(member, guildRole).queue();
+                        member.getUser().openPrivateChannel().queue((channel) -> {
+                            channel.sendMessage("\"" + accountData.get("name") + "\" is not a member of guild \"" + guildRoleName + "\"").queue();
+                        });
                     } else {
                         member.getGuild().addRoleToMember(member, guildRole).queue();
                         if (primary) {
