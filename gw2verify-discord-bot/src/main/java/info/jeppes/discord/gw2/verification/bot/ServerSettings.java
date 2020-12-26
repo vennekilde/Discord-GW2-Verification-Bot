@@ -5,6 +5,9 @@
  */
 package info.jeppes.discord.gw2.verification.bot;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  *
  * @author venne
@@ -19,6 +22,7 @@ public class ServerSettings {
     private final String DJRoleID;
     private final String CommanderRoleID;
     private final String[] RolesToRemoveWhenInvalid;
+    private final Map<String, String> AccessTypeRoles;
 
     public ServerSettings(boolean addAccountName, String HomeWorldRoleID, String LinkedWorldRoleID, String TempHomeWorldRoleID, String TempLinkedWorldRoleID, String DJRoleID, String CommanderRoleID, String[] RolesToRemoveWhenInvalid) {
         this.addAccountName = addAccountName;
@@ -29,6 +33,7 @@ public class ServerSettings {
         this.DJRoleID = DJRoleID;
         this.CommanderRoleID = CommanderRoleID;
         this.RolesToRemoveWhenInvalid = RolesToRemoveWhenInvalid;
+        this.AccessTypeRoles = new HashMap();
     }
 
     public boolean isAddAccountName() {
@@ -61,5 +66,9 @@ public class ServerSettings {
 
     public String[] getRolesToRemoveWhenInvalid() {
         return RolesToRemoveWhenInvalid;
+    }
+
+    public Map<String, String> getAccessTypeRoles() {
+        return AccessTypeRoles;
     }
 }
