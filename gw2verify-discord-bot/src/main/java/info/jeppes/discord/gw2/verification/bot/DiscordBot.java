@@ -819,10 +819,10 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 case ACCESS_GRANTED_HOME_WORLD:
                     if (accessStatus.getIsPrimary() == null || accessStatus.getIsPrimary()) {
                         //Access is primary and not a music bot
-                        addRoleToUserIfNotOwned(member, rolesForUser,
+                        addRoleToUserIfNotOwned(member, false, rolesForUser,
                                 roleCache.get(settings.getHomeWorldRoleID()),
                                 roleCache.get(settings.getDJRoleID()));
-                        boolean removedAny = removeRoleFromUserIfOwned(member, rolesForUser,
+                        boolean removedAny = removeRoleFromUserIfOwned(member, false, rolesForUser,
                                 roleCache.get(settings.getLinkedWorldRoleID()),
                                 roleCache.get(settings.getTempHomeWorldRoleID()),
                                 roleCache.get(settings.getTempLinkedWorldRoleID())/*, musicBotRole*/);
@@ -831,8 +831,8 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                         }
                     } else {
                         //Access is granted trough another user and is a music bot
-                        addRoleToUserIfNotOwned(member, rolesForUser/*, musicBotRole*/);
-                        boolean removedAny = removeRoleFromUserIfOwned(member, rolesForUser,
+                        addRoleToUserIfNotOwned(member, false, rolesForUser/*, musicBotRole*/);
+                        boolean removedAny = removeRoleFromUserIfOwned(member, false, rolesForUser,
                                 roleCache.get(settings.getHomeWorldRoleID()),
                                 roleCache.get(settings.getLinkedWorldRoleID()),
                                 roleCache.get(settings.getTempHomeWorldRoleID()),
@@ -857,10 +857,10 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 case ACCESS_GRANTED_LINKED_WORLD:
                     if (accessStatus.getIsPrimary() == null || accessStatus.getIsPrimary()) {
                         //Access is primary and not a music bot
-                        addRoleToUserIfNotOwned(member, rolesForUser,
+                        addRoleToUserIfNotOwned(member, false, rolesForUser,
                                 roleCache.get(settings.getLinkedWorldRoleID()),
                                 roleCache.get(settings.getDJRoleID()));
-                        boolean removedAny = removeRoleFromUserIfOwned(member, rolesForUser,
+                        boolean removedAny = removeRoleFromUserIfOwned(member, false, rolesForUser,
                                 roleCache.get(settings.getHomeWorldRoleID()),
                                 roleCache.get(settings.getTempHomeWorldRoleID()),
                                 roleCache.get(settings.getTempLinkedWorldRoleID())/*, musicBotRole*/);
@@ -869,8 +869,8 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                         }
                     } else {
                         //Access is granted trough another user and is a music bot
-                        addRoleToUserIfNotOwned(member, rolesForUser/*, musicBotRole*/);
-                        boolean removedAny = removeRoleFromUserIfOwned(member, rolesForUser,
+                        addRoleToUserIfNotOwned(member, false, rolesForUser/*, musicBotRole*/);
+                        boolean removedAny = removeRoleFromUserIfOwned(member, false, rolesForUser,
                                 roleCache.get(settings.getHomeWorldRoleID()),
                                 roleCache.get(settings.getLinkedWorldRoleID()),
                                 roleCache.get(settings.getTempHomeWorldRoleID()),
@@ -901,7 +901,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     // YOU ALREADY DID THIS ONCE!!!!
 //                    Role[] rolesForUserArray = new Role[rolesForUser.size()];
 //                    removeRoleFromUserIfOwned(member, rolesForUser, (Role[]) rolesForUser.toArray(rolesForUserArray));
-                    boolean removedAny = removeRoleFromUserIfOwned(member, rolesForUser,
+                    boolean removedAny = removeRoleFromUserIfOwned(member, false, rolesForUser,
                             roleCache.get(settings.getHomeWorldRoleID()),
                             roleCache.get(settings.getLinkedWorldRoleID()),
                             roleCache.get(settings.getTempHomeWorldRoleID()),
@@ -912,7 +912,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     }
                     if (settings.getRolesToRemoveWhenInvalid() != null) {
                         List<Role> additionalRolesList = Arrays.stream(settings.getRolesToRemoveWhenInvalid()).map(roleCache::get).collect(Collectors.toList());
-                        removedAny = removeRoleFromUserIfOwned(member, rolesForUser, additionalRolesList.toArray(new Role[additionalRolesList.size()]));
+                        removedAny = removeRoleFromUserIfOwned(member, false, rolesForUser, additionalRolesList.toArray(new Role[additionalRolesList.size()]));
                         if (removedAny) {
                             LOGGER.info("Removed additional roles from " + member.getEffectiveName() + " due to " + verificationStatus);
                         }
@@ -928,7 +928,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         Map<String, Object> accountData = (Map<String, Object>) accessStatus.getAdditionalProperties().get("AccountData");
 
         //Add account name as display name
-        if (serverSettings.get(serverId).isAddAccountName() && member.getNickname() == null) {
+        if (settings.isAddAccountName() && member.getNickname() == null) {
             if (accountData != null) {
                 String accountName = (String) accountData.get("name");
                 if (accountName != null && accountName != "") {
@@ -947,7 +947,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 
         // add free to play role
         if (accountData != null) {
-            serverSettings.get(serverId).getAccessTypeRoles().forEach((accessName, roleID) -> {
+            settings.getAccessTypeRoles().forEach((accessName, roleID) -> {
                 List<String> accessList = (List) accountData.get("access");
                 if (accessList != null) {
                     boolean hasAccessType = accessList.stream().anyMatch(a -> accessName.equals(a));
@@ -956,11 +956,12 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                         if ("PlayForFree".equals(accessName)) {
                             boolean hasNormalAccess = accessList.stream().anyMatch(a -> "GuildWars2".equals(a));
                             if (hasNormalAccess) {
-                                // Skip. User is not free to play, but was in the past.
+                                // User is not free to play, but was in the past.
+                                removeRoleFromUserIfOwned(member, true, rolesForUser, roleCache.get(roleID));
                                 return;
                             }
                         }
-                        addRoleToUserIfNotOwned(member, rolesForUser, roleCache.get(roleID));
+                        addRoleToUserIfNotOwned(member, true, rolesForUser, roleCache.get(roleID));
                     }
                 }
             });
@@ -990,7 +991,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         });
     }
 
-    public boolean removeRoleFromUserIfOwned(Member member, List<Role> givenRoles, Role... roles) {
+    public boolean removeRoleFromUserIfOwned(Member member, boolean silent, List<Role> givenRoles, Role... roles) {
         ServerSettings settings = serverSettings.get(member.getGuild().getId());
         boolean result = false;
         List<Role> rolesToRemove = new ArrayList();
@@ -1005,23 +1006,26 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 member.getGuild().removeRoleFromMember(member, roleToRemove).queue();
             });
             result = true;
-            //Send message to user about removed roles
-            final StringBuilder rolesStr = new StringBuilder();
-            member.getUser().openPrivateChannel().queue((channel) -> {
-                rolesToRemove.forEach((role) -> {
-                    if (!role.getId().equals(settings.getDJRoleID())) {
-                        rolesStr.append("\n - ").append(role.getName());
-                    }
+
+            if (!silent) {
+                //Send message to user about removed roles
+                final StringBuilder rolesStr = new StringBuilder();
+                member.getUser().openPrivateChannel().queue((channel) -> {
+                    rolesToRemove.forEach((role) -> {
+                        if (!role.getId().equals(settings.getDJRoleID())) {
+                            rolesStr.append("\n - ").append(role.getName());
+                        }
+                    });
+                    MessageAction message = channel.sendMessage("You have been removed from the following roles on Discord server \"" + member.getGuild().getName() + "\"" + rolesStr.toString());
+                    message.submit();
                 });
-                MessageAction message = channel.sendMessage("You have been removed from the following roles on Discord server \"" + member.getGuild().getName() + "\"" + rolesStr.toString());
-                message.submit();
-            });
+            }
         }
         return result;
     }
 
-    public boolean addRoleToUserIfNotOwned(Member member, List<Role> givenRoles, Role... roles) {
-        ServerSettings settings = serverSettings.get(member.getGuild().getId());
+    public boolean addRoleToUserIfNotOwned(Member member, boolean silent, List<Role> givenRoles, Role... roles) {
+        final ServerSettings settings = serverSettings.get(member.getGuild().getIdLong());
         boolean result = false;
         List<Role> rolesToAssign = new ArrayList();
         for (Role role : roles) {
@@ -1035,19 +1039,21 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 member.getGuild().addRoleToMember(member, roleToAssign).queue();
             });
             result = true;
-            //Send message to user about added roles
-            final StringBuilder rolesStr = new StringBuilder();
-            member.getUser().openPrivateChannel().queue((channel) -> {
-                rolesToAssign.forEach((role) -> {
-                    if (!role.getId().equals(settings.getDJRoleID())) {
-                        rolesStr.append("\n - ").append(role.getName());
+            if (!silent) {
+                //Send message to user about added roles
+                final StringBuilder rolesStr = new StringBuilder();
+                member.getUser().openPrivateChannel().queue((channel) -> {
+                    rolesToAssign.forEach((role) -> {
+                        if (!role.getId().equals(settings.getDJRoleID())) {
+                            rolesStr.append("\n - ").append(role.getName());
+                        }
+                    });
+                    if (rolesStr.length() != 0) {
+                        MessageAction message = channel.sendMessage("You have been added to the following roles on Discord server \"" + member.getGuild().getName() + "\"" + rolesStr.toString());
+                        message.submit();
                     }
                 });
-                if (rolesStr.length() != 0) {
-                    MessageAction message = channel.sendMessage("You have been added to the following roles on Discord server \"" + member.getGuild().getName() + "\"" + rolesStr.toString());
-                    message.submit();
-                }
-            });
+            }
         }
         return result;
     }
