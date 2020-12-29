@@ -1054,7 +1054,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 final StringBuilder rolesStr = new StringBuilder();
                 member.getUser().openPrivateChannel().queue((channel) -> {
                     rolesToRemove.forEach((role) -> {
-                        if (!role.getId().equals(settings.getDJRoleID())) {
+                        if (role != null && !role.getId().equals(settings.getDJRoleID())) {
                             rolesStr.append("\n - ").append(role.getName());
                         }
                     });
