@@ -556,7 +556,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                         String reason = builder.toString();
                         long duration = 0;
                         try {
-                            if ("-p".equals(durationString)) {
+                            if ("p".equals(durationString)) {
                                 duration = Long.MAX_VALUE;
                             } else {
                                 duration = TimeUtils.getDurationMillisFromString(durationString);
