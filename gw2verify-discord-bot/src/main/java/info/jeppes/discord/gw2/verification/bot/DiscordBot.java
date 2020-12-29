@@ -9,12 +9,14 @@ import com.farshiverpeaks.gw2verifyclient.api.GuildWars2VerificationAPIClient;
 import com.farshiverpeaks.gw2verifyclient.exceptions.GuildWars2VerificationAPIException;
 import com.farshiverpeaks.gw2verifyclient.model.APIKeyData;
 import com.farshiverpeaks.gw2verifyclient.model.APIKeyName;
+import com.farshiverpeaks.gw2verifyclient.model.BanData;
 import com.farshiverpeaks.gw2verifyclient.model.Error;
 import com.farshiverpeaks.gw2verifyclient.model.TemporaryData;
 import com.farshiverpeaks.gw2verifyclient.model.VerificationStatus;
 import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.apikey.model.ApikeyPUTHeader;
 import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.apikey.model.ApikeyPUTQueryParam;
 import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.apikey.name.model.NameGETHeader;
+import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.ban.model.BanPUTHeader;
 import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.properties.model.PropertiesPUTHeader;
 import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.properties.model.PropertiesPUTQueryParam;
 import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.verification.refresh.model.RefreshPOSTHeader;
@@ -54,6 +56,7 @@ import me.xhsun.guildwars2wrapper.GuildWars2;
 import net.dv8tion.jda.api.AccountType;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.ChannelType;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.GuildVoiceState;
@@ -97,6 +100,8 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 //    private static final String TEMP_HOME_WORLD = "HOME_WORLD";
 //    private static final String TEMP_LINKED_WORLD = "LINKED_WORLD";
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+    private static final Pattern MENTION_ID_PATTERN = Pattern.compile("<@!(\\d*)>", Pattern.CASE_INSENSITIVE);
 
     private GuildWars2 gw2api;
     private GuildWars2VerificationAPIClient apiClient;
@@ -266,7 +271,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 
     @Override
     public void onGuildMemberJoin(GuildMemberJoinEvent event) {
-        sendRulesMessage(event.getUser());
+        //sendRulesMessage(event.getUser());
         try {
             sendVerifyMessageCheckAccess(event.getUser());
         } catch (GuildWars2VerificationAPIException ex) {
@@ -524,10 +529,10 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     refreshAccess(event.getAuthor().getId());
                     updateUserRoles(event.getAuthor());
                     break;
-                case "/rules":
-                case "!rules":
-                    sendRulesMessage(event.getAuthor());
-                    break;
+                //case "/rules":
+                //case "!rules":
+                //    sendRulesMessage(event.getAuthor());
+                //    break;
                 case "/help":
                 case "!help":
                 case "commands":
@@ -535,8 +540,45 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 case "!commands":
                     handleHelp(event);
                     break;
+                case "/gw2ban":
+                case "!gw2ban":
+                    if (event.getMember() == null || !event.getMember().hasPermission(Permission.ADMINISTRATOR)) {
+                        return;
+                    }
+                    if (content.length >= 4) {
+                        String targetID = content[1];
+                        String durationString = content[2];
+                        String[] reasonArray = Arrays.copyOfRange(content, 3, content.length);
+                        StringBuilder builder = new StringBuilder();
+                        for (String s : reasonArray) {
+                            builder.append(s).append(" ");
+                        }
+                        String reason = builder.toString();
+                        long duration = 0;
+                        try {
+                            if ("-p".equals(durationString)) {
+                                duration = Long.MAX_VALUE;
+                            } else {
+                                duration = TimeUtils.getDurationMillisFromString(durationString);
+                            }
+                        } catch (IllegalArgumentException ex) {
+                            event.getChannel().sendMessage("Could not parse provided duration string: " + durationString).queue();
+                        }
+                        Matcher matcher = MENTION_ID_PATTERN.matcher(targetID);
+                        if (matcher.matches()) {
+                            targetID = matcher.group(1);
+                        }
+                        if (duration > 0) {
+                            banUser(targetID, duration, reason);
+                            event.getChannel().sendMessage(content[1] + " has been banned for " + TimeUtils.getTimeWWDDHHMMSSStringShort(duration / 1000) + "\nReason: " + reason).queue();
+                        }
+                    } else {
+                        event.getChannel().sendMessage("Missing argumnents. Command format: /gw2ban <user-id> <duration> <reason>\nDuration examples:\n - 1d2h3m4s = 1 Days, 2 Hours, 3 Minutes and 4 seconds\n - p = Permanent").queue();
+                    }
+                    break;
                 default:
                     if (event.getChannelType() == ChannelType.PRIVATE) {
+                        // check if message is an apikey
                         if (content[0].toUpperCase().matches("^(?:[A-F\\d]{4,20}-?){8,}$")) {
                             handleSetAPIKey(event, content[0]);
                         } else {
@@ -1108,6 +1150,14 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 .serviceId(SERVICE_ID)
                 .serviceUserId(userId).verification.temporary.put(body, headers).getBody();
         return expiresIn;
+    }
+
+    public void banUser(String userId, long duration, String reason) throws GuildWars2VerificationAPIException {
+        BanData body = new BanData().withDuration(duration).withReason(reason);
+        BanPUTHeader headers = new BanPUTHeader(getAPIAuthToken());
+        getAPIClient().users
+                .serviceId(SERVICE_ID)
+                .serviceUserId(userId).ban.put(body, headers).getBody();
     }
 
     public void setUserProperty(String userId, String name, String value) throws GuildWars2VerificationAPIException {
