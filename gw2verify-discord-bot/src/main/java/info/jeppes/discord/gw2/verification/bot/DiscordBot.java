@@ -10,19 +10,22 @@ import com.farshiverpeaks.gw2verifyclient.exceptions.GuildWars2VerificationAPIEx
 import com.farshiverpeaks.gw2verifyclient.model.APIKeyData;
 import com.farshiverpeaks.gw2verifyclient.model.APIKeyName;
 import com.farshiverpeaks.gw2verifyclient.model.BanData;
+import com.farshiverpeaks.gw2verifyclient.model.ChannelMetadata;
+import com.farshiverpeaks.gw2verifyclient.model.ChannelUserMetadata;
 import com.farshiverpeaks.gw2verifyclient.model.Error;
 import com.farshiverpeaks.gw2verifyclient.model.TemporaryData;
 import com.farshiverpeaks.gw2verifyclient.model.VerificationStatus;
-import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.apikey.model.ApikeyPUTHeader;
-import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.apikey.model.ApikeyPUTQueryParam;
-import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.apikey.name.model.NameGETHeader;
-import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.ban.model.BanPUTHeader;
-import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.properties.model.PropertiesPUTHeader;
-import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.properties.model.PropertiesPUTQueryParam;
-import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.verification.refresh.model.RefreshPOSTHeader;
-import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.verification.status.model.StatusGETHeader;
-import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.verification.status.model.StatusGETQueryParam;
-import com.farshiverpeaks.gw2verifyclient.resource.users.service_id.service_user_id.verification.temporary.model.TemporaryPUTHeader;
+import com.farshiverpeaks.gw2verifyclient.resource.v1.channels.service_id.channel.statistics.model.StatisticsPOSTHeader;
+import com.farshiverpeaks.gw2verifyclient.resource.v1.users.service_id.service_user_id.apikey.model.ApikeyPUTHeader;
+import com.farshiverpeaks.gw2verifyclient.resource.v1.users.service_id.service_user_id.apikey.model.ApikeyPUTQueryParam;
+import com.farshiverpeaks.gw2verifyclient.resource.v1.users.service_id.service_user_id.apikey.name.model.NameGETHeader;
+import com.farshiverpeaks.gw2verifyclient.resource.v1.users.service_id.service_user_id.ban.model.BanPUTHeader;
+import com.farshiverpeaks.gw2verifyclient.resource.v1.users.service_id.service_user_id.properties.model.PropertiesPUTHeader;
+import com.farshiverpeaks.gw2verifyclient.resource.v1.users.service_id.service_user_id.properties.model.PropertiesPUTQueryParam;
+import com.farshiverpeaks.gw2verifyclient.resource.v1.users.service_id.service_user_id.verification.refresh.model.RefreshPOSTHeader;
+import com.farshiverpeaks.gw2verifyclient.resource.v1.users.service_id.service_user_id.verification.status.model.StatusGETHeader;
+import com.farshiverpeaks.gw2verifyclient.resource.v1.users.service_id.service_user_id.verification.status.model.StatusGETQueryParam;
+import com.farshiverpeaks.gw2verifyclient.resource.v1.users.service_id.service_user_id.verification.temporary.model.TemporaryPUTHeader;
 import info.jeppes.discord.gw2.verification.bot.utils.TimeUtils;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -99,7 +102,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 
 //    private static final String TEMP_HOME_WORLD = "HOME_WORLD";
 //    private static final String TEMP_LINKED_WORLD = "LINKED_WORLD";
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(10);
 
     private static final Pattern MENTION_ID_PATTERN = Pattern.compile("<@!(\\d*)>", Pattern.CASE_INSENSITIVE);
 
@@ -189,7 +192,6 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     .addEventListeners(this)
                     .build();
             discordAPI.setAutoReconnect(true);
-
             if (refreshSchedule == null) {
                 refreshSchedule = scheduler.schedule(() -> {
                     updateRefreshSchedule();
@@ -251,6 +253,37 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             });
 //            musicBotRole = guild.getRoleById(MUSIC_BOT_ROLE_NAME);
         }
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                StatisticsPOSTHeader headers = new StatisticsPOSTHeader(apiAuthToken);
+                getDiscordAPI().getVoiceChannels().forEach((channel) -> {
+                    try {
+                        ChannelMetadata metadata = new ChannelMetadata();
+                        metadata.setUsers(new ArrayList());
+                        metadata.setName(channel.getName());
+                        channel.getMembers().forEach((member) -> {
+                            GuildVoiceState state = member.getVoiceState();
+                            if (state != null) {
+                                ChannelUserMetadata userMetadata = new ChannelUserMetadata();
+                                userMetadata.setDeafened(state.isDeafened());
+                                userMetadata.setMuted(state.isMuted());
+                                userMetadata.setId(member.getId());
+                                userMetadata.setStreaming(state.isStream());
+                                userMetadata.setName(member.getEffectiveName());
+                                metadata.getUsers().add(userMetadata);
+                            }
+                        });
+                        if (!metadata.getUsers().isEmpty()) {
+                            apiClient.v1.channels.serviceId(SERVICE_ID).channel(channel.getId()).statistics.post(metadata, headers);
+                        }
+                    } catch (Exception ex) {
+                        LOGGER.error(ex.getMessage(), ex);
+                    }
+                });
+            } catch (Exception ex) {
+                LOGGER.error(ex.getMessage(), ex);
+            }
+        }, 0, 5, TimeUnit.MINUTES);
     }
 
     /**
@@ -823,7 +856,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     }
 
 //    public Session getUniqueLinkURL(User user) {
-//        return apiClient.createSession(user.getIdLong(), null, user.getName(), true);
+//        return apiClient.v1.createSession(user.getIdLong(), null, user.getName(), true);
 //    }
     private final SimpleDateFormat dataFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
@@ -1136,7 +1169,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     public VerificationStatus getStatus(String userId, String displayName) throws GuildWars2VerificationAPIException {
         StatusGETQueryParam qParams = new StatusGETQueryParam().withDisplayName(displayName);
         StatusGETHeader headers = new StatusGETHeader(getAPIAuthToken());
-        VerificationStatus accessStatusData = getAPIClient().users
+        VerificationStatus accessStatusData = getAPIClient().v1.users
                 .serviceId(SERVICE_ID)
                 .serviceUserId(userId).verification.status.get(qParams, headers).getBody();
         return accessStatusData;
@@ -1146,7 +1179,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         TemporaryData body = new TemporaryData()
                 .withAccessType(accessType).withDisplayName(displayName);
         TemporaryPUTHeader headers = new TemporaryPUTHeader(getAPIAuthToken());
-        long expiresIn = getAPIClient().users
+        long expiresIn = getAPIClient().v1.users
                 .serviceId(SERVICE_ID)
                 .serviceUserId(userId).verification.temporary.put(body, headers).getBody();
         return expiresIn;
@@ -1155,7 +1188,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     public void banUser(String userId, long duration, String reason) throws GuildWars2VerificationAPIException {
         BanData body = new BanData().withDuration(duration).withReason(reason);
         BanPUTHeader headers = new BanPUTHeader(getAPIAuthToken());
-        getAPIClient().users
+        getAPIClient().v1.users
                 .serviceId(SERVICE_ID)
                 .serviceUserId(userId).ban.put(body, headers).getBody();
     }
@@ -1163,14 +1196,14 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     public void setUserProperty(String userId, String name, String value) throws GuildWars2VerificationAPIException {
         PropertiesPUTQueryParam qParams = new PropertiesPUTQueryParam(name, value);
         PropertiesPUTHeader headers = new PropertiesPUTHeader(getAPIAuthToken());
-        getAPIClient().users
+        getAPIClient().v1.users
                 .serviceId(SERVICE_ID)
                 .serviceUserId(userId).properties.put(qParams, headers).getBody();
     }
 
     public VerificationStatus refreshAccess(String userId) throws GuildWars2VerificationAPIException {
         RefreshPOSTHeader headers = new RefreshPOSTHeader(getAPIAuthToken());
-        VerificationStatus response = getAPIClient().users
+        VerificationStatus response = getAPIClient().v1.users
                 .serviceId(SERVICE_ID)
                 .serviceUserId(userId).verification.refresh.post(headers).getBody();
         return response;
@@ -1180,14 +1213,14 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         APIKeyData body = new APIKeyData(apikey, primary);
         ApikeyPUTHeader headers = new ApikeyPUTHeader(getAPIAuthToken());
         ApikeyPUTQueryParam qParams = new ApikeyPUTQueryParam(false);
-        getAPIClient().users
+        getAPIClient().v1.users
                 .serviceId(SERVICE_ID)
                 .serviceUserId(userId).apikey.put(body, qParams, headers);
     }
 
     public String getAPIKeyName(String userId) throws GuildWars2VerificationAPIException {
         NameGETHeader headers = new NameGETHeader(getAPIAuthToken());
-        APIKeyName response = getAPIClient().users
+        APIKeyName response = getAPIClient().v1.users
                 .serviceId(SERVICE_ID)
                 .serviceUserId(userId).apikey.name.get(headers).getBody();
         return response.getName();

@@ -9,7 +9,7 @@ import com.farshiverpeaks.gw2verifyclient.api.GuildWars2VerificationAPIClient;
 import com.farshiverpeaks.gw2verifyclient.exceptions.GuildWars2VerificationAPIException;
 import com.farshiverpeaks.gw2verifyclient.model.ServiceLink;
 import com.farshiverpeaks.gw2verifyclient.model.VerificationStatus;
-import com.farshiverpeaks.gw2verifyclient.resource.updates.service_id.subscribe.model.SubscribeGETHeader;
+import com.farshiverpeaks.gw2verifyclient.resource.v1.updates.service_id.subscribe.model.SubscribeGETHeader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -65,7 +65,7 @@ public class DiscordMain {
             while (true) {
                 try {
                     SubscribeGETHeader headers = new SubscribeGETHeader(discordBot.getAPIAuthToken());
-                    VerificationStatus status = apiClient.updates.serviceId("2").subscribe.get(headers).getBody();
+                    VerificationStatus status = apiClient.v1.updates.serviceId("2").subscribe.get(headers).getBody();
                     LOGGER.info("Received verication update from server {}", status.toString());
                     getDiscordBot().getDiscordAPI().getGuilds().forEach((guild) -> {
                         for (ServiceLink link : status.getServiceLinks()) {
