@@ -634,7 +634,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     }
 
     public void handleSetAPIKey(MessageReceivedEvent event, String apikey) throws GuildWars2VerificationAPIException {
-        setAPIKey(event.getAuthor().getId(), apikey, false);
+        setAPIKey(event.getAuthor().getId(), apikey, true);
         sendPrivateMessage(event.getAuthor(), "APIKey changed to: " + apikey);
         updateUserRoles(event.getAuthor());
     }
