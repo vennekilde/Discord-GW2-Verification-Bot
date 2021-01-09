@@ -1054,7 +1054,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     if (guildId != null) {
                         if (accountData != null) {
                             List<String> guilds = (List<String>) accountData.get("guilds");
-                            if (!guilds.contains(guildId)) {
+                            if (guilds != null && !guilds.contains(guildId)) {
                                 removeGuildRole(member, role);
                                 LOGGER.info("Removing " + member.getEffectiveName() + " from guild role: " + role.getName());
                             }
