@@ -461,6 +461,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     }
 
     public void sendPrivateMessage(User user, String message) {
+        LOGGER.debug("Sent to " + user.getId() + ": " + message);
         user.openPrivateChannel().queue((channel) -> {
             channel.sendMessage(message).queue();
         });
