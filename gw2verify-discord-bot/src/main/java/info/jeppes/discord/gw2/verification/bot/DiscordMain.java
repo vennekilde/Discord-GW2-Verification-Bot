@@ -56,7 +56,7 @@ public class DiscordMain {
                 @Override
                 protected Client getClient() {
                     final Client client = ClientBuilder.newClient();
-                    client.property(ClientProperties.CONNECT_TIMEOUT, 5000);
+                    client.property(ClientProperties.CONNECT_TIMEOUT, 10000);
                     //High timeout for polling client
                     client.property(ClientProperties.READ_TIMEOUT, 150000);
                     return client;
