@@ -29,6 +29,7 @@ import com.farshiverpeaks.gw2verifyclient.resource.v1.users.service_id.service_u
 import info.jeppes.discord.gw2.verification.bot.utils.TimeUtils;
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
@@ -53,6 +54,7 @@ import java.util.stream.Collectors;
 import javax.security.auth.DestroyFailedException;
 import javax.security.auth.Destroyable;
 import javax.security.auth.login.LoginException;
+import javax.ws.rs.ProcessingException;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import me.xhsun.guildwars2wrapper.GuildWars2;
@@ -631,6 +633,13 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             } else {
                 sendPrivateMessage(event.getAuthor(), "Unable to communicate with verification backend");
             }
+        } catch (ProcessingException ex) {
+            Throwable cause = ex.getCause();
+            if (cause instanceof SocketTimeoutException) {
+                sendPrivateMessage(event.getAuthor(), "Verification system took too long to respond\nGuild Wars 2 API might be overloaded, please try again");
+            }
+            LOGGER.error(ex.getMessage(), ex);
+            sendPrivateMessage(event.getAuthor(), "Unable to communicate with verification backend");
         } catch (Throwable ex) {
             LOGGER.error(ex.getMessage(), ex);
             sendPrivateMessage(event.getAuthor(), "Unable to communicate with verification backend");
