@@ -625,12 +625,12 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     break;
             }
         } catch (GuildWars2VerificationAPIException ex) {
-            LOGGER.error("Author " + event.getAuthor().getId() + " caused exeption: " + ex.getMessage(), ex);
             Error error = getErrorFromGW2VerificationAPIException(ex);
             if (error != null && error.getSafeDisplayError() != null) {
                 LOGGER.error("User display error: " + error.getSafeDisplayError());
                 sendPrivateMessage(event.getAuthor(), error.getSafeDisplayError());
             } else {
+                LOGGER.error("Author " + event.getAuthor().getId() + " caused exeption: " + ex.getMessage(), ex);
                 sendPrivateMessage(event.getAuthor(), "Unable to communicate with verification backend");
             }
         } catch (ProcessingException ex) {
