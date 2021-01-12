@@ -637,9 +637,10 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             Throwable cause = ex.getCause();
             if (cause instanceof SocketTimeoutException) {
                 sendPrivateMessage(event.getAuthor(), "Verification system took too long to respond\nGuild Wars 2 API might be overloaded, please try again");
+            } else {
+                LOGGER.error(ex.getMessage(), ex);
+                sendPrivateMessage(event.getAuthor(), "Unable to communicate with verification backend");
             }
-            LOGGER.error(ex.getMessage(), ex);
-            sendPrivateMessage(event.getAuthor(), "Unable to communicate with verification backend");
         } catch (Throwable ex) {
             LOGGER.error(ex.getMessage(), ex);
             sendPrivateMessage(event.getAuthor(), "Unable to communicate with verification backend");
