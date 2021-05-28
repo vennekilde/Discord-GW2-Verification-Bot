@@ -430,7 +430,8 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         String message = "Go to https://account.arena.net/applications and create an API key \n"
                 + "**Requirement:** You have to name your API Key **" + apikeyName + "**\n"
                 + "**Required Permissions:** Characters & Progression \n\n"
-                + "Once you have your api key, type */verify <apikey>* to verify yourself";
+                + "Once you have your api key, type */verify <apikey>* to verify yourself\n\n"
+                + "By verifying yourself, you agree to our privacy agreement, which can be seen by typing /privacy";
         sendPrivateMessage(user, message);
         LOGGER.info("Sent authentication message to user: {}", user.getId());
     }
@@ -480,6 +481,12 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             LOGGER.info(event.getChannel().getName() + " - " + event.getAuthor().getId() + ":" + name + ": " + rawContent);
             String[] content = rawContent.split(" ");
             switch (content[0].toLowerCase()) {
+                case "!privacy":
+                case "/privacy":
+                    event.getAuthor().openPrivateChannel().queue(channel -> {
+                        PrivacyStatement.sendPrivacyStatement(channel);
+                    });
+                    break;
                 case "!glistm":
                     if (event.getAuthor().getId() == "187402729696526336") {
                         StringBuilder sb = new StringBuilder();
@@ -656,10 +663,11 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     public void handleHelp(MessageReceivedEvent event) {
         sendPrivateMessage(event.getAuthor(), "Available commands\n"
                 + "/verify **apikey** - Verify yourself with an API key\n"
-                + "/status          - Displays your current verification status\n"
-                + "/rules           - Get a list of current discord rules\n"
-                + "/refresh         - Forces the Discord bot to refresh your verification status with the verification server (If everything works, this should do absolutely nothing)\n"
-                + "/help            - Shows list of available commands");
+                + "/status          - Display your current verification status\n"
+                + "/rules           - List of current discord rules\n"
+                + "/refresh         - Force the Discord bot to refresh your verification status with the verification server (If everything works, this should do absolutely nothing)\n"
+                + "/privacy         - Show privacy agreement"
+                + "/help            - Show list of available commands");
     }
 
     @Override
