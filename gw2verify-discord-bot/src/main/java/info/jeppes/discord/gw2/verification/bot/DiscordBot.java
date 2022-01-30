@@ -617,6 +617,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                         return;
                     }
                     deleteOldMessages(COMMANDER_MUTE_CHANNEL);
+                    break;
                 case "/gw2ban":
                 case "!gw2ban":
                     if (event.getMember() == null || !event.getMember().hasPermission(Permission.ADMINISTRATOR)) {
