@@ -99,7 +99,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 
 //    private static final String MUSIC_BOT_ROLE_NAME = "182813018919272448";
     private static final String WELCOME_CHANNEL = "529635390164959232";
-    private static final String COMMAND_MUTE_CHANNEL = "937234209192423485";
+    private static final String COMMANDER_MUTE_CHANNEL = "937234209192423485";
     private static final String SERVER_NAME = "Far Shiverpeaks";
     private static final String SERVICE_ID = "2";
 
@@ -216,7 +216,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
             discordAPI.setAutoReconnect(true);
             if (cleanupSchedule == null) {
                 cleanupSchedule = scheduler.scheduleAtFixedRate(() -> {
-                    deleteOldMessages(COMMAND_MUTE_CHANNEL);
+                    deleteOldMessages(COMMANDER_MUTE_CHANNEL);
                 }, 0, 1, TimeUnit.DAYS);
             }
             if (refreshSchedule == null) {
@@ -611,6 +611,12 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                 case "!commands":
                     handleHelp(event);
                     break;
+                case "/purge":
+                case "!purge":
+                    if (event.getMember() == null || !event.getMember().hasPermission(Permission.ADMINISTRATOR)) {
+                        return;
+                    }
+                    deleteOldMessages(COMMANDER_MUTE_CHANNEL);
                 case "/gw2ban":
                 case "!gw2ban":
                     if (event.getMember() == null || !event.getMember().hasPermission(Permission.ADMINISTRATOR)) {
