@@ -691,13 +691,13 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         StringBuilder sb = new StringBuilder();
         sb.append("Available commands\n")
                 .append("/verify **apikey** - Verify yourself with an API key\n")
-                .append("/status          - Display your current verification status\n")
-                .append("/rules           - List of current discord rules\n")
-                .append("\"/refresh         - Force the Discord bot to refresh your verification status with the verification server (If everything works, this should do absolutely nothing)\\n\"");
+                .append("/status            - Display your current verification status\n")
+                .append("/rules             - List of current discord rules\n")
+                .append("/refresh           - Force the Discord bot to refresh your verification status with the verification server (If everything works, this should do absolutely nothing)\n");
         if (DiscordBot.ENABLE_PRIVACY_STATEMENT != null && DiscordBot.ENABLE_PRIVACY_STATEMENT.equalsIgnoreCase("true")) {
-            sb.append("/privacy         - Show privacy agreement");
+            sb.append("/privacy           - Show privacy agreement");
         }
-        sb.append("/help            - Show list of available commands");
+        sb.append("/help              - Show list of available commands");
         sendPrivateMessage(event.getAuthor(), sb.toString());
     }
 
