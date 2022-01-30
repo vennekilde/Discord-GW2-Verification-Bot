@@ -99,6 +99,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 
 //    private static final String MUSIC_BOT_ROLE_NAME = "182813018919272448";
     private static final String WELCOME_CHANNEL = "529635390164959232";
+    private static final String COMMAND_MUTE_CHANNEL = "937234209192423485";
     private static final String SERVER_NAME = "Far Shiverpeaks";
     private static final String SERVICE_ID = "2";
 
@@ -117,6 +118,7 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
 //    private Role musicBotRole = null;
     private JDA discordAPI;
     private ScheduledFuture<?> refreshSchedule;
+    private ScheduledFuture<?> cleanupSchedule;
     private LinkedList<Long> scheduledRefreshes;
     private Map<Long, User> scheduledRefreshesMap;
     private List<Long> userRefreshingRoles;
@@ -177,6 +179,22 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         return config;
     }
 
+    public void deleteOldMessages(String channelId) {
+        try {
+            TextChannel channel = discordAPI.getTextChannelById(channelId);
+            if (channel != null) {
+                MessageHistory.MessageRetrieveAction history = channel.getHistoryFromBeginning(100);
+                history.submit().get().getRetrievedHistory().forEach((message) -> {
+                    if (!message.isPinned()) {
+                        message.delete().submit();
+                    }
+                });
+            }
+        } catch (InterruptedException | ExecutionException ex) {
+            Logger.getLogger(DiscordBot.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
     public void init() throws IOException {
         apiClient = new GuildWars2VerificationAPIClient(config.getString("base_rest_url")) {
             @Override
@@ -194,6 +212,11 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
                     .addEventListeners(this)
                     .build();
             discordAPI.setAutoReconnect(true);
+            if (cleanupSchedule == null) {
+                cleanupSchedule = scheduler.scheduleAtFixedRate(() -> {
+                    deleteOldMessages(COMMAND_MUTE_CHANNEL);
+                }, 0, 1, TimeUnit.DAYS);
+            }
             if (refreshSchedule == null) {
                 refreshSchedule = scheduler.schedule(() -> {
                     updateRefreshSchedule();
@@ -1254,6 +1277,10 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         if (refreshSchedule != null) {
             refreshSchedule.cancel(true);
             refreshSchedule = null;
+        }
+        if (cleanupSchedule != null) {
+            cleanupSchedule.cancel(true);
+            cleanupSchedule = null;
         }
     }
 
