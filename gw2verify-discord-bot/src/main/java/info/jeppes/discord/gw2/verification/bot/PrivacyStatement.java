@@ -37,6 +37,8 @@ public class PrivacyStatement {
     }
 
     public static void sendPrivacyStatement(MessageChannel channel) {
-        Arrays.asList(PRIVACY_STATEMENT).forEach(section -> channel.sendMessage(section).queue());
+        if (DiscordBot.ENABLE_PRIVACY_STATEMENT != null && DiscordBot.ENABLE_PRIVACY_STATEMENT.equalsIgnoreCase("true")) {
+            Arrays.asList(PRIVACY_STATEMENT).forEach(section -> channel.sendMessage(section).queue());
+        }
     }
 }

@@ -103,6 +103,8 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     private static final String SERVER_NAME = "Far Shiverpeaks";
     private static final String SERVICE_ID = "2";
 
+    public static final String ENABLE_PRIVACY_STATEMENT = System.getenv("ENABLE_PRIVACY_STATEMENT");
+
 //    private static final String TEMP_HOME_WORLD = "HOME_WORLD";
 //    private static final String TEMP_LINKED_WORLD = "LINKED_WORLD";
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(10);
@@ -453,8 +455,10 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
         String message = "Go to https://account.arena.net/applications and create an API key \n"
                 + "**Requirement:** You have to name your API Key **" + apikeyName + "**\n"
                 + "**Required Permissions:** Characters & Progression \n\n"
-                + "Once you have your api key, type */verify <apikey>* to verify yourself\n\n"
-                + "By verifying yourself, you agree to our privacy agreement, which can be seen by typing /privacy";
+                + "Once you have your api key, type */verify <apikey>* to verify yourself\n\n";
+        if (DiscordBot.ENABLE_PRIVACY_STATEMENT != null && DiscordBot.ENABLE_PRIVACY_STATEMENT.equalsIgnoreCase("true")) {
+            message += "By verifying yourself, you agree to our privacy agreement, which can be seen by typing /privacy";
+        }
         sendPrivateMessage(user, message);
         LOGGER.info("Sent authentication message to user: {}", user.getId());
     }
@@ -684,13 +688,17 @@ public class DiscordBot extends ListenerAdapter implements Destroyable {
     }
 
     public void handleHelp(MessageReceivedEvent event) {
-        sendPrivateMessage(event.getAuthor(), "Available commands\n"
-                + "/verify **apikey** - Verify yourself with an API key\n"
-                + "/status          - Display your current verification status\n"
-                + "/rules           - List of current discord rules\n"
-                + "/refresh         - Force the Discord bot to refresh your verification status with the verification server (If everything works, this should do absolutely nothing)\n"
-                + "/privacy         - Show privacy agreement"
-                + "/help            - Show list of available commands");
+        StringBuilder sb = new StringBuilder();
+        sb.append("Available commands\n")
+                .append("/verify **apikey** - Verify yourself with an API key\n")
+                .append("/status          - Display your current verification status\n")
+                .append("/rules           - List of current discord rules\n")
+                .append("\"/refresh         - Force the Discord bot to refresh your verification status with the verification server (If everything works, this should do absolutely nothing)\\n\"");
+        if (DiscordBot.ENABLE_PRIVACY_STATEMENT != null && DiscordBot.ENABLE_PRIVACY_STATEMENT.equalsIgnoreCase("true")) {
+            sb.append("/privacy         - Show privacy agreement");
+        }
+        sb.append("/help            - Show list of available commands");
+        sendPrivateMessage(event.getAuthor(), sb.toString());
     }
 
     @Override
