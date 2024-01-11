@@ -14,9 +14,8 @@ RUN mvn -f $HOME/pom.xml clean package
 #
 FROM eclipse-temurin:21-jre-jammy
 
-ARG JAR_FILE=/usr/app/target/*.jar
+ARG JAR_FILE=/usr/app/gw2verify-discord-bot/target/gw2verify-discord-bot-jar-with-dependencies.jar
 COPY --from=build $JAR_FILE /app/gw2verify-discord.jar
 
 WORKDIR /app
-ENTRYPOINT ["java"]
-CMD ["-jar", "gw2verify-discord.jar"]
+ENTRYPOINT ["java", "-jar", "/app/gw2verify-discord.jar"]
